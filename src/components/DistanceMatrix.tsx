@@ -197,12 +197,12 @@ export default function DistanceMatrix({
   }
 
   return (
-    <div className="max-w-7xl mx-auto h-screen flex flex-col p-4">
+    <main className="max-w-7xl mx-auto h-screen flex flex-col p-4" role="main">
       {/* Header */}
-      <div className="mb-4 flex-shrink-0">
+      <header className="mb-4 flex-shrink-0">
         <div className="flex items-center space-x-3 mb-2">
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-2 rounded-lg">
-            <ChartBarIcon className="h-6 w-6 text-white" />
+            <ChartBarIcon className="h-6 w-6 text-white" aria-hidden="true" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
             Distance Matrix
@@ -214,35 +214,37 @@ export default function DistanceMatrix({
           </div> */}
         </div>
         <p className="text-gray-600 text-lg">View and analyze calculated distances between sources and destinations</p>
-      </div>
+      </header>
 
       {/* Simple Status Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4 flex-shrink-0">
+      <section className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4 flex-shrink-0" aria-labelledby="analytics-heading">
+        <h2 id="analytics-heading" className="sr-only">Distance Analytics</h2>
         <div className="bg-blue-50 p-3 rounded-lg text-center">
-          <div className="text-lg font-bold text-blue-600">{analytics.shortest.toFixed(1)}km</div>
+          <div className="text-lg font-bold text-blue-600" aria-label={`Shortest route: ${analytics.shortest.toFixed(1)} kilometers`}>{analytics.shortest.toFixed(1)}km</div>
           <div className="text-xs text-blue-600">Shortest Route</div>
         </div>
         <div className="bg-green-50 p-3 rounded-lg text-center">
-          <div className="text-lg font-bold text-green-600">{analytics.average.toFixed(1)}km</div>
+          <div className="text-lg font-bold text-green-600" aria-label={`Average distance: ${analytics.average.toFixed(1)} kilometers`}>{analytics.average.toFixed(1)}km</div>
           <div className="text-xs text-green-600">Average Distance</div>
         </div>
         <div className="bg-purple-50 p-3 rounded-lg text-center">
-          <div className="text-lg font-bold text-purple-600">{analytics.longest.toFixed(1)}km</div>
+          <div className="text-lg font-bold text-purple-600" aria-label={`Longest route: ${analytics.longest.toFixed(1)} kilometers`}>{analytics.longest.toFixed(1)}km</div>
           <div className="text-xs text-purple-600">Longest Route</div>
         </div>
         <div className="bg-indigo-50 p-3 rounded-lg text-center">
-          <div className="text-lg font-bold text-indigo-600">{totalItems}</div>
+          <div className="text-lg font-bold text-indigo-600" aria-label={`Total routes: ${totalItems}`}>{totalItems}</div>
           <div className="text-xs text-indigo-600">Total Routes</div>
         </div>
-      </div>
+      </section>
 
       {/* Distance Matrix Table - Flexible Height */}
-      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0 mb-4">
+      <section className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0 mb-4" aria-labelledby="distance-table-heading">
+        <h2 id="distance-table-heading" className="sr-only">Distance Matrix Table</h2>
         <div className="overflow-x-auto overflow-y-auto flex-1">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Distance calculations between sources and destinations">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Source
                   <div className="mt-1">
                     <input
@@ -251,10 +253,11 @@ export default function DistanceMatrix({
                       value={sourceSearch}
                       onChange={(e) => setSourceSearch(e.target.value)}
                       className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      aria-label="Search sources"
                     />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Destination
                   <div className="mt-1">
                     <input
@@ -263,25 +266,26 @@ export default function DistanceMatrix({
                       value={destinationSearch}
                       onChange={(e) => setDestinationSearch(e.target.value)}
                       className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      aria-label="Search destinations"
                     />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Distance (km)
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Duration
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   To & Fro (2x)
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   + 40% (1.4x T&F)
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Updated
                 </th>
               </tr>
@@ -348,7 +352,7 @@ export default function DistanceMatrix({
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {/* Enhanced Pagination - Fixed at Bottom */}
       <div className="bg-white rounded-lg shadow p-4 flex-shrink-0">
@@ -390,6 +394,6 @@ export default function DistanceMatrix({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

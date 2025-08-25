@@ -393,7 +393,7 @@ export default function Calculator({
         </div>
 
         {/* Efficiency Tip */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 mb-6">
+        {/* <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 mb-6">
           <div className="flex items-start space-x-3">
             <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
             <div>
@@ -403,7 +403,7 @@ export default function Calculator({
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Main Calculator Card */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-visible mb-8">
