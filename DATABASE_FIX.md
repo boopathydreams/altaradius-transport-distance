@@ -12,23 +12,24 @@ Run the sequence fix script to synchronize all table sequences with their maximu
 
 ### On Vercel (Production)
 
-1. Add the following environment variable to your Vercel project:
-   - `RUN_SEQUENCE_FIX=true`
+**Method 1: Environment Variable (Recommended)**
+1. In your Vercel project dashboard, go to Settings → Environment Variables
+2. Add: `RUN_SEQUENCE_FIX` = `true`
+3. Deploy - the sequence fix will run automatically after the build
 
-2. Deploy and it will automatically run the fix on the next deployment.
+**Method 2: Direct Build Command**
+1. In Vercel project settings, set Build Command to:
+   ```bash
+   npm run build:vercel
+   ```
+2. This will build and then run the sequence fix
 
-### Manually via Script
-
+**Method 3: One-time Fix via CLI**
 ```bash
-# In your project directory
-npm run fix-sequences
-```
-
-### Via Vercel CLI
-
-```bash
-# If you have Vercel CLI installed
-vercel exec -- npm run fix-sequences
+# Using Vercel CLI
+vercel env add RUN_SEQUENCE_FIX
+# Enter 'true' when prompted
+vercel --prod
 ```
 
 ## What the Script Does

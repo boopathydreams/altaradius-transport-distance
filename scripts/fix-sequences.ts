@@ -7,7 +7,7 @@ async function fixSequences() {
     console.log('Fixing all sequences...')
 
     const tables = ['Source', 'Destination', 'Distance', 'User']
-    
+
     for (const table of tables) {
       try {
         // Get max ID for current table using dynamic query

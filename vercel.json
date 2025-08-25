@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:prod",
+  "buildCommand": "npm run build:prod && node scripts/postbuild.js",
   "env": {
     "PRISMA_GENERATE_SKIP_AUTOINSTALL": "true"
   },
