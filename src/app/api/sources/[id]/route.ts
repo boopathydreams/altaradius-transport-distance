@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/auth'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication
@@ -13,7 +13,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const sourceId = parseInt(params.id)
+    const { id } = await params
+    const sourceId = parseInt(id)
 
     if (isNaN(sourceId)) {
       return NextResponse.json({ error: 'Invalid source ID' }, { status: 400 })
