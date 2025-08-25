@@ -53,6 +53,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(source, { status: 201 })
   } catch (error) {
     console.error('Error creating source:', error)
+    
+    // Check if it's a Prisma unique constraint error
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A source with this information already exists' },
+        { status: 409 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

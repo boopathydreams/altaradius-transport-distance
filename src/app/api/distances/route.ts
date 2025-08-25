@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10000') // Increased default limit to show all distances
 
+    // New filtering parameters
+    const sourceFilter = searchParams.get('sourceFilter') || ''
+    const destinationFilter = searchParams.get('destinationFilter') || ''
+
     // Scenario 3: Both source and destination specified
     if (sourceId && destinationId) {
       return await calculateSingleDistance(parseInt(sourceId), parseInt(destinationId))
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
       return await calculateAllDistances()
     } else {
       // Default: Return existing distances with pagination (fast)
-      return await getExistingDistances(page, limit)
+      return await getExistingDistances(page, limit, sourceFilter, destinationFilter)
     }
   } catch (error) {
     console.error('Error in distances API:', error)
@@ -61,18 +65,57 @@ export async function GET(request: NextRequest) {
 }
 
 // Fast function to get existing distances without calculation
-async function getExistingDistances(page: number = 1, limit: number = 1000) { // Back to safe limit
-  console.log(`Fetching existing distances - Page: ${page}, Limit: ${limit}`)
+async function getExistingDistances(page: number = 1, limit: number = 1000, sourceFilter: string = '', destinationFilter: string = '') { // Back to safe limit
+  console.log(`Fetching existing distances - Page: ${page}, Limit: ${limit}, Source filter: "${sourceFilter}", Destination filter: "${destinationFilter}"`)
 
   const skip = (page - 1) * limit
 
   try {
-    // Get total count first for pagination info
-    const totalCount = await prisma.distance.count()
-    console.log(`Total distances in DB: ${totalCount}, requesting ${limit} starting from ${skip}`)
+    // Build filter conditions for Prisma where clause
+    const whereClause: {
+      source?: {
+        name: {
+          contains: string
+          mode: 'insensitive'
+        }
+      }
+      destination?: {
+        name: {
+          contains: string
+          mode: 'insensitive'
+        }
+      }
+    } = {}
 
-    // Get existing distances with minimal data to reduce response size
+    // Add source name filtering
+    if (sourceFilter) {
+      whereClause.source = {
+        name: {
+          contains: sourceFilter,
+          mode: 'insensitive' // Case-insensitive search
+        }
+      }
+    }
+
+    // Add destination name filtering
+    if (destinationFilter) {
+      whereClause.destination = {
+        name: {
+          contains: destinationFilter,
+          mode: 'insensitive' // Case-insensitive search
+        }
+      }
+    }
+
+    // Get total count with filters applied
+    const totalCount = await prisma.distance.count({
+      where: whereClause
+    })
+    console.log(`Total distances in DB (filtered): ${totalCount}, requesting ${limit} starting from ${skip}`)
+
+    // Get existing distances with filtering applied
     const distances = await prisma.distance.findMany({
+      where: whereClause,
       skip,
       take: limit,
       select: {

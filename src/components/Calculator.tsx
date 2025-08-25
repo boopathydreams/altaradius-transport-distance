@@ -460,7 +460,7 @@ export default function Calculator({
                         placeholder="e.g., Main Office, Warehouse A"
                         value={newSourceName}
                         onChange={(e) => setNewSourceName(e.target.value)}
-                        className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -472,7 +472,7 @@ export default function Calculator({
                           placeholder="e.g., 40.7128"
                           value={newSourceLatitude}
                           onChange={(e) => setNewSourceLatitude(e.target.value)}
-                          className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         />
                       </div>
                       <div>
@@ -483,7 +483,7 @@ export default function Calculator({
                           placeholder="e.g., -74.0060"
                           value={newSourceLongitude}
                           onChange={(e) => setNewSourceLongitude(e.target.value)}
-                          className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                         />
                       </div>
                     </div>
@@ -494,7 +494,7 @@ export default function Calculator({
                         placeholder="e.g., 123 Business St, City, State, Country"
                         value={newSourceAddress}
                         onChange={(e) => setNewSourceAddress(e.target.value)}
-                        className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full border border-green-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       />
                     </div>
                     <div className="flex space-x-3">
@@ -568,7 +568,7 @@ export default function Calculator({
                         placeholder="e.g., Customer Location, Store Branch"
                         value={newDestinationName}
                         onChange={(e) => setNewDestinationName(e.target.value)}
-                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                       />
                     </div>
                     <div>
@@ -578,7 +578,7 @@ export default function Calculator({
                         placeholder="e.g., 110001, 500032"
                         value={newDestinationPincode}
                         onChange={(e) => setNewDestinationPincode(e.target.value)}
-                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                       />
                     </div>
                     <div>
@@ -588,7 +588,7 @@ export default function Calculator({
                         placeholder="e.g., 456 Customer Ave, City, State, Country"
                         value={newDestinationAddress}
                         onChange={(e) => setNewDestinationAddress(e.target.value)}
-                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -600,7 +600,7 @@ export default function Calculator({
                           placeholder="e.g., 28.6139"
                           value={newDestinationLatitude}
                           onChange={(e) => setNewDestinationLatitude(e.target.value)}
-                          className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                          className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         />
                       </div>
                       <div>
@@ -611,7 +611,7 @@ export default function Calculator({
                           placeholder="e.g., 77.2090"
                           value={newDestinationLongitude}
                           onChange={(e) => setNewDestinationLongitude(e.target.value)}
-                          className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                          className="w-full border border-red-200 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         />
                       </div>
                     </div>

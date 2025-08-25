@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../../components/Sidebar'
 import Calculator from '../../components/Calculator'
 import DistanceMatrix from '../../components/DistanceMatrix'
@@ -106,15 +106,23 @@ interface PaginationInfo {
 }
 
 // Function to load distances with proper pagination (only current page)
-const loadDistancePage = async (page: number = 1, limit: number = 50): Promise<{ distances: Distance[], pagination: PaginationInfo }> => {
+const loadDistancePage = async (page: number = 1, limit: number = 50, sourceFilter: string = '', destinationFilter: string = ''): Promise<{ distances: Distance[], pagination: PaginationInfo }> => {
   try {
-    const response = await fetch(`/api/distances?page=${page}&limit=${limit}`)
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    })
+
+    if (sourceFilter) params.append('sourceFilter', sourceFilter)
+    if (destinationFilter) params.append('destinationFilter', destinationFilter)
+
+    const response = await fetch(`/api/distances?${params.toString()}`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log(`Loaded distances page ${page}: ${data.distances?.length || 0} distances`)
+    console.log(`Loaded distances page ${page}: ${data.distances?.length || 0} distances (filtered: source="${sourceFilter}", destination="${destinationFilter}")`)
 
     return {
       distances: data.distances || [],
@@ -139,6 +147,10 @@ export default function AppPage() {
   const [distancePagination, setDistancePagination] = useState<PaginationInfo>({} as PaginationInfo)
   const [currentDistancePage, setCurrentDistancePage] = useState(1)
 
+  // Filter state for distance matrix
+  const [sourceFilter, setSourceFilter] = useState('')
+  const [destinationFilter, setDestinationFilter] = useState('')
+
   // Loading states
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isLoadingDistances, setIsLoadingDistances] = useState(false)
@@ -152,13 +164,24 @@ export default function AppPage() {
     console.log('Cache cleared')
   }
 
-  // Load specific page of distances
-  const loadDistancesPage = useCallback(async (page: number) => {
+  // Load specific page of distances with filters - with better state management
+  const loadDistancesPage = useCallback(async (page: number, sourceFilterParam?: string, destinationFilterParam?: string) => {
     if (isLoadingDistances) return // Prevent multiple simultaneous loads
+
+    const currentSourceFilter = sourceFilterParam ?? sourceFilter
+    const currentDestinationFilter = destinationFilterParam ?? destinationFilter
+
+    // Only trigger loading if page or filters actually changed
+    if (page === currentDistancePage &&
+        currentSourceFilter === sourceFilter &&
+        currentDestinationFilter === destinationFilter &&
+        distances.length > 0) {
+      return // No need to reload
+    }
 
     setIsLoadingDistances(true)
     try {
-      const { distances: pageDistances, pagination } = await loadDistancePage(page, 50)
+      const { distances: pageDistances, pagination } = await loadDistancePage(page, 50, currentSourceFilter, currentDestinationFilter)
       setDistances(pageDistances)
       setDistancePagination(pagination)
       setCurrentDistancePage(page)
@@ -167,7 +190,7 @@ export default function AppPage() {
     } finally {
       setIsLoadingDistances(false)
     }
-  }, [isLoadingDistances])
+  }, [isLoadingDistances, sourceFilter, destinationFilter, currentDistancePage, distances.length])
 
   // Load sources only when needed
   const loadSources = useCallback(async () => {
@@ -389,29 +412,27 @@ export default function AppPage() {
 
             {activeSection === 'distances' && (
               <div>
-                {isLoadingDistances ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                    <div className="text-sm text-gray-600">Loading distances...</div>
-                  </div>
-                ) : (
-                  <>
-                    <DistanceMatrix
-                      distances={distances}
-                      pagination={distancePagination}
-                      currentPage={currentDistancePage}
-                      onPageChange={loadDistancesPage}
-                    />
-                    {/* {distanceStats.calculatedDistances > 0 && (
-                      <div className="mt-4 text-sm text-gray-600">
-                        Showing {distances.length} of {distanceStats.calculatedDistances} total distances
-                        {distancePagination.total && (
-                          <span> • Page {currentDistancePage} of {distancePagination.pages}</span>
-                        )}
-                      </div>
-                    )} */}
-                  </>
-                )}
+                <>
+                  <DistanceMatrix
+                    distances={distances}
+                    pagination={distancePagination}
+                    currentPage={currentDistancePage}
+                    onPageChange={loadDistancesPage}
+                    sourceFilter={sourceFilter}
+                    destinationFilter={destinationFilter}
+                    onSourceFilterChange={setSourceFilter}
+                    onDestinationFilterChange={setDestinationFilter}
+                    isLoading={isLoadingDistances}
+                  />
+                  {/* {distanceStats.calculatedDistances > 0 && (
+                    <div className="mt-4 text-sm text-gray-600">
+                      Showing {distances.length} of {distanceStats.calculatedDistances} total distances
+                      {distancePagination.total && (
+                        <span> • Page {currentDistancePage} of {distancePagination.pages}</span>
+                      )}
+                    </div>
+                  )} */}
+                </>
               </div>
             )}
 

@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com",
+    url: process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com",
     siteName: "Altaradius Distance Calculator",
     title: "Distance Calculator - Altaradius Transport Solutions",
     description: "Professional distance calculation tool for transport logistics. Calculate accurate driving distances and durations between multiple locations.",
@@ -72,7 +72,7 @@ export const metadata: Metadata = {
     images: ["/og-image.jpg"],
   },
   alternates: {
-    canonical: process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com",
+    canonical: process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com",
   },
   category: "Transportation",
 };
@@ -88,7 +88,7 @@ export default function RootLayout({
         {/* Additional SEO meta tags */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#4f46e5" />
-        <link rel="canonical" href={process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com"} />
+        <link rel="canonical" href={process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com"} />
 
         {/* Structured Data for Organization */}
         <script
@@ -98,8 +98,8 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "Altaradius Transport Solutions",
-              "url": process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com",
-              "logo": `${process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com"}/logo.png`,
+              "url": process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com",
+              "logo": `${process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com"}/logo.png`,
               "description": "Professional transport and logistics solutions provider",
               "foundingDate": "2020",
               "industry": "Transportation and Logistics",
@@ -117,7 +117,7 @@ export default function RootLayout({
               "@type": "WebApplication",
               "name": "Altaradius Distance Calculator",
               "description": "Professional distance calculation tool for transport logistics. Calculate accurate driving distances and durations between multiple locations.",
-              "url": process.env.NEXT_PUBLIC_BASE_URL || "https://distance.altaradius.com",
+              "url": process.env.NEXT_PUBLIC_BASE_URL || "https://vat.altaradius.com",
               "applicationCategory": "Transportation",
               "operatingSystem": "Web Browser",
               "offers": {
