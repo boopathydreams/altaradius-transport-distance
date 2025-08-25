@@ -97,6 +97,37 @@ export default function AppPage() {
     }
   }
 
+  // Efficient update functions
+  const addSource = (newSource: Source) => {
+    setSources(prev => [...prev, newSource])
+  }
+
+  const addDestination = (newDestination: Destination) => {
+    setDestinations(prev => [...prev, newDestination])
+  }
+
+  const removeSource = (sourceId: number) => {
+    setSources(prev => prev.filter(s => s.id !== sourceId))
+    // Also remove related distances
+    setDistances(prev => prev.filter(d => d.source.id !== sourceId))
+  }
+
+  const removeDestination = (destinationId: number) => {
+    setDestinations(prev => prev.filter(d => d.id !== destinationId))
+    // Also remove related distances
+    setDistances(prev => prev.filter(d => d.destination.id !== destinationId))
+  }
+
+  // Refresh only distances (when user explicitly calculates)
+  const refreshDistances = async () => {
+    try {
+      const distancesData = await cachedFetch('/api/distances')
+      setDistances(distancesData as Distance[])
+    } catch (error) {
+      console.error('Error loading distances:', error)
+    }
+  }
+
   // Refresh data and clear cache
   const refreshData = async () => {
     clearCache()
@@ -168,7 +199,9 @@ export default function AppPage() {
                 sources={sources}
                 destinations={destinations}
                 distances={distances}
-                onRefresh={refreshData}
+                onRefresh={refreshDistances}
+                onSourceAdded={addSource}
+                onDestinationAdded={addDestination}
               />
             )}
 
@@ -183,6 +216,8 @@ export default function AppPage() {
                 sources={sources}
                 destinations={destinations}
                 onRefresh={refreshData}
+                onSourceDeleted={removeSource}
+                onDestinationDeleted={removeDestination}
               />
             )}
           </div>

@@ -1,13 +1,13 @@
 # Distance Calculator Web Application
 
-A modern Next.js web application for calculating truck driving distances between sources and destinations using Google Maps API. Built with authentication, SQLite database caching, and comprehensive distance management features.
+A modern Next.js web application for calculating truck driving distances between sources and destinations using Google Maps API. Built with authentication, PostgreSQL database caching, and comprehensive distance management features.
 
 ## Features
 
 - 🔐 **User Authentication**: Secure login system with JWT tokens
 - 📍 **Source & Destination Management**: Add, view, and manage sources with coordinates and destinations with pincodes
 - 🗺️ **Google Maps Integration**: Calculate real truck driving distances and durations
-- 💾 **Smart Caching**: SQLite database caching to avoid duplicate API calls
+- 💾 **Smart Caching**: PostgreSQL database caching to avoid duplicate API calls
 - ⚡ **Batch Processing**: Efficient batch distance calculations for multiple routes
 - 📊 **Multiple Scenarios**:
   - Source → All Destinations
@@ -19,7 +19,7 @@ A modern Next.js web application for calculating truck driving distances between
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Next.js API Routes, Prisma ORM
-- **Database**: SQLite with Prisma
+- **Database**: PostgreSQL with Prisma
 - **Authentication**: JWT tokens, bcryptjs
 - **External API**: Google Maps Distance Matrix API
 - **Development**: ESLint, TypeScript, Turbopack
@@ -29,6 +29,7 @@ A modern Next.js web application for calculating truck driving distances between
 ### Prerequisites
 
 - Node.js 18+ and npm
+- PostgreSQL database (local or cloud)
 - Google Maps API key (optional for development)
 
 ### Installation
@@ -38,13 +39,18 @@ A modern Next.js web application for calculating truck driving distances between
    npm install
    ```
 
-2. **Set up the database:**
+2. **Set up environment variables:**
    ```bash
-   npm run db:generate
+   cp .env.example .env
+   ```
+   Edit `.env` with your database connection string and other credentials.
+
+3. **Set up the database:**
+   ```bash
    npm run db:push
    ```
 
-3. **Seed the database with CSV data:**
+4. **Seed the database with CSV data:**
    ```bash
    npm run db:seed
    ```
@@ -137,10 +143,45 @@ Select both source and destination to get the specific distance and route detail
 - `npm run db:push` - Push schema changes to database
 - `npm run db:seed` - Seed database with CSV data
 
+## Deployment to Vercel
+
+### 1. Database Setup
+Create a PostgreSQL database on Vercel or use any PostgreSQL provider:
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Add Vercel Postgres to your project
+vercel storage create postgres
+```
+
+### 2. Environment Variables
+Set these in your Vercel project settings:
+
+```env
+DATABASE_URL="postgresql://username:password@host:port/database"
+NEXTAUTH_URL="https://your-app.vercel.app"
+NEXTAUTH_SECRET="your-production-secret"
+GOOGLE_MAPS_API_KEY="your-google-maps-api-key"
+JWT_SECRET="your-production-jwt-secret"
+```
+
+### 3. Deploy
+```bash
+vercel deploy
+```
+
+The build process will automatically:
+- Generate Prisma Client
+- Push database schema
+- Build the Next.js application
+
 ### Environment Variables
 
 ```env
-DATABASE_URL="file:./dev.db"
+# Development
+DATABASE_URL="postgresql://localhost:5432/distance_web_dev"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key"
 GOOGLE_MAPS_API_KEY="your-google-maps-api-key"

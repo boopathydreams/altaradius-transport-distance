@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { geocodeAddressWithFallbacks } from '@/lib/googleMaps'
+import type { Destination } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,7 +44,7 @@ export async function PATCH(request: NextRequest) {
       }
     })
 
-    const updatePromises = destinationsWithoutCoords.map(async (destination) => {
+    const updatePromises = destinationsWithoutCoords.map(async (destination: Destination) => {
       console.log(`Attempting to geocode destination "${destination.name}"`)
 
       const location = await geocodeAddressWithFallbacks(

@@ -49,6 +49,8 @@ interface CalculatorProps {
   destinations: Destination[]
   distances: Distance[]
   onRefresh: () => void
+  onSourceAdded?: (newSource: Source) => void
+  onDestinationAdded?: (newDestination: Destination) => void
 }
 
 interface ResultState {
@@ -61,7 +63,9 @@ export default function Calculator({
   sources,
   destinations,
   distances,
-  onRefresh
+  onRefresh,
+  onSourceAdded,
+  onDestinationAdded
 }: CalculatorProps) {
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
   const [selectedDestinationId, setSelectedDestinationId] = useState<string>('')
@@ -196,7 +200,12 @@ export default function Calculator({
           type: 'success',
           message: `Successfully added source: ${newSource.name}`
         })
-        onRefresh()
+        // Use callback to update parent state efficiently
+        if (onSourceAdded) {
+          onSourceAdded(newSource)
+        } else {
+          onRefresh()
+        }
       } else {
         const error = await response.json()
         setResult({
@@ -251,7 +260,12 @@ export default function Calculator({
           type: 'success',
           message: `Successfully added destination: ${newDestination.name}`
         })
-        onRefresh()
+        // Use callback to update parent state efficiently
+        if (onDestinationAdded) {
+          onDestinationAdded(newDestination)
+        } else {
+          onRefresh()
+        }
       } else {
         const error = await response.json()
         setResult({
@@ -334,7 +348,20 @@ export default function Calculator({
           </div>
         </div>
 
-      {/* Main Calculator Card */}
+        {/* Efficiency Tip */}
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <CheckCircleIcon className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-green-800 mb-1">💡 Efficient Workflow</h3>
+              <p className="text-sm text-green-700">
+                Add sources and destinations instantly without page reloads. Then use the <strong>&ldquo;Calculate Distance&rdquo;</strong> button to compute routes when ready.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Calculator Card */}
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-visible mb-8">
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 px-8 py-6 border-b border-gray-100">
           <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
@@ -368,7 +395,8 @@ export default function Calculator({
                   options={sources}
                   value={selectedSourceId}
                   onChange={setSelectedSourceId}
-                  placeholder="🔍 Search and select a source..."
+                  placeholder="Select a source location..."
+                  label="Source Location"
                   disabled={isLoading}
                 />
               </div>
@@ -475,7 +503,8 @@ export default function Calculator({
                   options={destinations}
                   value={selectedDestinationId}
                   onChange={setSelectedDestinationId}
-                  placeholder="🔍 Search and select a destination..."
+                  placeholder="Select a destination location..."
+                  label="Destination Location"
                   disabled={isLoading}
                 />
               </div>

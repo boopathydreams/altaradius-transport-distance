@@ -21,9 +21,11 @@ interface ManageDataProps {
   sources: Source[]
   destinations: Destination[]
   onRefresh: () => void
+  onSourceDeleted?: (sourceId: number) => void
+  onDestinationDeleted?: (destinationId: number) => void
 }
 
-export default function ManageData({ sources, destinations, onRefresh }: ManageDataProps) {
+export default function ManageData({ sources, destinations, onRefresh, onSourceDeleted, onDestinationDeleted }: ManageDataProps) {
   const [activeTab, setActiveTab] = useState<'sources' | 'destinations' | 'tools'>('sources')
   const [isLoading, setIsLoading] = useState(false)
   const [batchPincodes, setBatchPincodes] = useState('')
@@ -41,7 +43,12 @@ export default function ManageData({ sources, destinations, onRefresh }: ManageD
       })
 
       if (response.ok) {
-        onRefresh()
+        // Use callback to update parent state efficiently
+        if (onSourceDeleted) {
+          onSourceDeleted(id)
+        } else {
+          onRefresh()
+        }
       } else {
         alert('Failed to delete source')
       }
@@ -65,7 +72,12 @@ export default function ManageData({ sources, destinations, onRefresh }: ManageD
       })
 
       if (response.ok) {
-        onRefresh()
+        // Use callback to update parent state efficiently
+        if (onDestinationDeleted) {
+          onDestinationDeleted(id)
+        } else {
+          onRefresh()
+        }
       } else {
         alert('Failed to delete destination')
       }

@@ -1,6 +1,11 @@
 {
-  "buildCommand": "prisma generate && npm run build",
+  "buildCommand": "npm run build:prod",
   "env": {
     "PRISMA_GENERATE_SKIP_AUTOINSTALL": "true"
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
   }
 }

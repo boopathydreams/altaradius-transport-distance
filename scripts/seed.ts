@@ -59,12 +59,12 @@ async function main() {
     console.log('🌱 Starting database seed...')
 
     // Create default admin user
-    const hashedPassword = await hashPassword('admin123')
+    const hashedPassword = await hashPassword('vignesh@vat')
     await prisma.user.upsert({
-      where: { username: 'admin' },
+      where: { username: 'vignesh' },
       update: {},
       create: {
-        username: 'admin',
+        username: 'vignesh',
         password: hashedPassword,
       },
     })
