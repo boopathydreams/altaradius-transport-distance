@@ -122,7 +122,8 @@ export default function Calculator({
 
       // Show appropriate loading message based on selection
       if (!selectedSourceId && !selectedDestinationId) {
-        console.log('Calculating distances for all source-destination combinations...')
+        console.log('Calculating missing distances in batches...')
+        params.append('batch', 'true')
       } else if (selectedSourceId && !selectedDestinationId) {
         console.log('Calculating distances from selected source to all destinations...')
       } else if (!selectedSourceId && selectedDestinationId) {
@@ -131,20 +132,30 @@ export default function Calculator({
         console.log('Calculating distance for specific source-destination pair...')
       }
 
-      const response = await fetch(`/api/distances?${params}`)
+      // Use the new calculate endpoint for on-demand calculations
+      const response = await fetch(`/api/calculate?${params}`, {
+        method: 'POST'
+      })
+      
       if (response.ok) {
         const data = await response.json()
-        if (selectedSourceId && selectedDestinationId && data.length > 0) {
+        if (selectedSourceId && selectedDestinationId && Array.isArray(data) && data.length > 0) {
           // Single distance calculation
           setResult({
             type: 'success',
             distance: data[0]
           })
+        } else if (data.message) {
+          // Batch calculation response
+          setResult({
+            type: 'success',
+            message: data.message
+          })
         } else {
           // Bulk calculation
           setResult({
             type: 'success',
-            message: `Successfully processed ${data.length} distance calculations.`
+            message: `Successfully processed ${Array.isArray(data) ? data.length : 0} distance calculations.`
           })
         }
         onRefresh()

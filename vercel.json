@@ -4,6 +4,12 @@
     "PRISMA_GENERATE_SKIP_AUTOINSTALL": "true"
   },
   "functions": {
+    "src/app/api/distances/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/calculate/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/**/*.ts": {
       "maxDuration": 30
     }
