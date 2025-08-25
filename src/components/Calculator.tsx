@@ -72,6 +72,7 @@ export default function Calculator({
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
   const [selectedDestinationId, setSelectedDestinationId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingRoute, setIsCheckingRoute] = useState(false)
   const [showAddSource, setShowAddSource] = useState(false)
   const [showAddDestination, setShowAddDestination] = useState(false)
   const [newSourceName, setNewSourceName] = useState('')
@@ -88,7 +89,13 @@ export default function Calculator({
   // Check for existing distance when source/destination changes
   useEffect(() => {
     const checkExistingDistance = async () => {
-      if (selectedSourceId && selectedDestinationId) {
+      // Only check if both values are selected and not empty, and we have data loaded
+      if (selectedSourceId && selectedDestinationId &&
+          selectedSourceId !== '' && selectedDestinationId !== '' &&
+          sources.length > 0 && destinations.length > 0) {
+        console.log('Checking route for:', selectedSourceId, '->', selectedDestinationId)
+        setIsCheckingRoute(true)
+        setResult(null) // Clear previous results while checking
         try {
           const response = await fetch(`/api/distances/check?sourceId=${selectedSourceId}&destinationId=${selectedDestinationId}`)
           if (response.ok) {
@@ -110,14 +117,20 @@ export default function Calculator({
         } catch (error) {
           console.error('Error checking existing distance:', error)
           setResult(null)
+        } finally {
+          setIsCheckingRoute(false)
         }
       } else {
+        // Clear states when no valid selection or data not loaded
         setResult(null)
+        setIsCheckingRoute(false)
       }
     }
 
-    checkExistingDistance()
-  }, [selectedSourceId, selectedDestinationId])
+    // Add a small debounce to prevent rapid calls
+    const timeoutId = setTimeout(checkExistingDistance, 100)
+    return () => clearTimeout(timeoutId)
+  }, [selectedSourceId, selectedDestinationId, sources.length, destinations.length])
 
   // Helper to check if route already exists (now uses API)
   const [existingRoute, setExistingRoute] = useState<Distance | null>(null)
@@ -636,23 +649,28 @@ export default function Calculator({
             <button
               type="button"
               onClick={handleCalculateDistance}
-              disabled={isLoading || (existingRoute !== null)}
+              disabled={isLoading || isCheckingRoute || (!!selectedSourceId && !!selectedDestinationId && existingRoute !== null)}
               className={`${
-                existingRoute
+                (!!selectedSourceId && !!selectedDestinationId && existingRoute)
                   ? 'bg-gray-400 cursor-not-allowed'
+                  : isCheckingRoute
+                  ? 'bg-yellow-500 cursor-not-allowed'
                   : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:scale-105'
               } text-white px-8 py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform flex items-center space-x-3 shadow-lg mx-auto`}
             >
               {isLoading ? (
                 <ArrowPathIcon className="h-5 w-5 animate-spin" />
-              ) : existingRoute ? (
+              ) : isCheckingRoute ? (
+                <ArrowPathIcon className="h-5 w-5 animate-spin" />
+              ) : (!!selectedSourceId && !!selectedDestinationId && existingRoute) ? (
                 <CheckCircleIcon className="h-5 w-5 text-green-500" />
               ) : (
                 <CalculatorIcon className="h-5 w-5" />
               )}
               <span>
                 {isLoading ? 'Calculating...' :
-                 existingRoute ? 'Route Already Available' : (
+                 isCheckingRoute ? 'Checking Route...' :
+                 (!!selectedSourceId && !!selectedDestinationId && existingRoute) ? 'Route Already Available' : (
                   !selectedSourceId && !selectedDestinationId ? 'Calculate All Distances' :
                   selectedSourceId && !selectedDestinationId ? 'Calculate to All Destinations' :
                   !selectedSourceId && selectedDestinationId ? 'Calculate from All Sources' :
@@ -663,39 +681,58 @@ export default function Calculator({
           </div>
 
           {/* Result Display - Integrated within form */}
-          {result && (
+          {(result || isCheckingRoute) && (
             <div className={`mt-6 rounded-xl shadow-lg border-2 overflow-hidden ${
-              result.type === 'success'
+              isCheckingRoute
+                ? 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-300'
+                : result?.type === 'success'
                 ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-300'
                 : 'bg-gradient-to-br from-red-50 to-red-100 border-red-300'
             }`}>
               <div className={`px-6 py-4 border-b flex items-center justify-between ${
-                result.type === 'success'
+                isCheckingRoute
+                  ? 'bg-yellow-100 border-yellow-200'
+                  : result?.type === 'success'
                   ? 'bg-green-100 border-green-200'
                   : 'bg-red-100 border-red-200'
               }`}>
                 <div className="flex items-center space-x-3">
-                  {result.type === 'success' ? (
+                  {isCheckingRoute ? (
+                    <ArrowPathIcon className="h-6 w-6 text-yellow-600 animate-spin" />
+                  ) : result?.type === 'success' ? (
                     <CheckCircleIcon className="h-6 w-6 text-green-600" />
                   ) : (
                     <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
                   )}
                   <h3 className={`font-semibold text-lg ${
-                    result.type === 'success' ? 'text-green-800' : 'text-red-800'
+                    isCheckingRoute
+                      ? 'text-yellow-800'
+                      : result?.type === 'success' ? 'text-green-800' : 'text-red-800'
                   }`}>
-                    {result.type === 'success' ? '🎯 Route Information' : '❌ Calculation Failed'}
+                    {isCheckingRoute
+                      ? '🔍 Checking Route Availability'
+                      : result?.type === 'success' ? '🎯 Route Information' : '❌ Calculation Failed'}
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={clearResult}
-                  className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-white/50"
-                >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
+                {!isCheckingRoute && (
+                  <button
+                    type="button"
+                    onClick={clearResult}
+                    className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-white/50"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                )}
               </div>
 
-              {result.type === 'success' && result.distance ? (
+              {isCheckingRoute ? (
+                <div className="p-6">
+                  <div className="flex items-center justify-center space-x-3">
+                    <ArrowPathIcon className="h-5 w-5 text-yellow-600 animate-spin" />
+                    <p className="text-yellow-700 font-medium">Checking if route already exists...</p>
+                  </div>
+                </div>
+              ) : result?.type === 'success' && result.distance ? (
                 <div className="p-6">
                   {/* Route Summary */}
                   <div className="bg-white rounded-xl p-4 mb-4 border border-green-200 shadow-sm">
@@ -762,7 +799,7 @@ export default function Calculator({
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : result && (
                 <div className="p-6">
                   <div className="flex items-start space-x-3">
                     <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />

@@ -207,11 +207,11 @@ export default function DistanceMatrix({
           <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
             Distance Matrix
           </h1>
-          <div className="bg-green-100 px-3 py-1 rounded-full">
+          {/* <div className="bg-green-100 px-3 py-1 rounded-full">
             <span className="text-sm font-medium text-green-800">
               {filteredDistances.length} {filteredDistances.length === distances.length ? 'routes' : `of ${distances.length} routes`}
             </span>
-          </div>
+          </div> */}
         </div>
         <p className="text-gray-600 text-lg">View and analyze calculated distances between sources and destinations</p>
       </div>
@@ -231,17 +231,16 @@ export default function DistanceMatrix({
           <div className="text-xs text-purple-600">Longest Route</div>
         </div>
         <div className="bg-indigo-50 p-3 rounded-lg text-center">
-          <div className="text-lg font-bold text-indigo-600">{filteredDistances.length}</div>
+          <div className="text-lg font-bold text-indigo-600">{totalItems}</div>
           <div className="text-xs text-indigo-600">Total Routes</div>
         </div>
       </div>
 
       {/* Distance Matrix Table - Flexible Height */}
       <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0 mb-4">
-        {/* Table Header */}
-        <div className="overflow-x-auto flex-shrink-0">
+        <div className="overflow-x-auto overflow-y-auto flex-1">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Source
@@ -287,12 +286,6 @@ export default function DistanceMatrix({
                 </th>
               </tr>
             </thead>
-          </table>
-        </div>
-
-        {/* Scrollable Table Body - Fills Available Height */}
-        <div className="overflow-x-auto overflow-y-auto flex-1">
-          <table className="min-w-full">
             <tbody className="bg-white divide-y divide-gray-200">
               {paginatedDistances.map((distance, index) => (
                 <tr key={distance.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -348,7 +341,7 @@ export default function DistanceMatrix({
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(distance.createdAt).toLocaleDateString()}
+                    {distance.createdAt ? new Date(distance.createdAt).toLocaleDateString() : 'N/A'}
                   </td>
                 </tr>
               ))}

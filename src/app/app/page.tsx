@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import Sidebar from '../../components/Sidebar'
 import Calculator from '../../components/Calculator'
 import DistanceMatrix from '../../components/DistanceMatrix'
@@ -127,15 +127,24 @@ const loadDistancePage = async (page: number = 1, limit: number = 50): Promise<{
 }
 
 export default function AppPage() {
+  // Sidebar and section state - completely separate from data loading
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [activeSection, setActiveSection] = useState<'calculator' | 'distances' | 'manage'>('calculator')
+
+  // Data state - only loaded when needed
   const [sources, setSources] = useState<Source[]>([])
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [distances, setDistances] = useState<Distance[]>([])
   const [distanceStats, setDistanceStats] = useState<DistanceStats>({} as DistanceStats)
   const [distancePagination, setDistancePagination] = useState<PaginationInfo>({} as PaginationInfo)
   const [currentDistancePage, setCurrentDistancePage] = useState(1)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeSection, setActiveSection] = useState<'calculator' | 'distances' | 'manage'>('calculator')
-  const [isLoading, setIsLoading] = useState(true)
+
+  // Loading states
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isLoadingDistances, setIsLoadingDistances] = useState(false)
+  const [hasLoadedSources, setHasLoadedSources] = useState(false)
+  const [hasLoadedDestinations, setHasLoadedDestinations] = useState(false)
+  const [hasLoadedStats, setHasLoadedStats] = useState(false)
 
   // Clear cache function for fresh data
   const clearCache = () => {
@@ -145,6 +154,9 @@ export default function AppPage() {
 
   // Load specific page of distances
   const loadDistancesPage = useCallback(async (page: number) => {
+    if (isLoadingDistances) return // Prevent multiple simultaneous loads
+
+    setIsLoadingDistances(true)
     try {
       const { distances: pageDistances, pagination } = await loadDistancePage(page, 50)
       setDistances(pageDistances)
@@ -152,33 +164,68 @@ export default function AppPage() {
       setCurrentDistancePage(page)
     } catch (error) {
       console.error('Error loading distances page:', error)
-    }
-  }, [])
-
-  // Load initial data efficiently
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const [sourcesData, destinationsData, statsData] = await Promise.all([
-        cachedFetch('/api/sources'),
-        cachedFetch('/api/destinations'),
-        loadDistanceStats() // Only get stats, not all distances
-      ])
-
-      setSources(sourcesData as Source[])
-      setDestinations(destinationsData as Destination[])
-      setDistanceStats(statsData)
-
-      // Load only first page of distances for the distance matrix view
-      if (activeSection === 'distances') {
-        await loadDistancesPage(1)
-      }
-    } catch (error) {
-      console.error('Error loading data:', error)
     } finally {
-      setIsLoading(false)
+      setIsLoadingDistances(false)
     }
-  }, [activeSection, loadDistancesPage])
+  }, [isLoadingDistances])
+
+  // Load sources only when needed
+  const loadSources = useCallback(async () => {
+    if (hasLoadedSources) return
+    try {
+      const sourcesData = await cachedFetch('/api/sources')
+      setSources(sourcesData as Source[])
+      setHasLoadedSources(true)
+    } catch (error) {
+      console.error('Error loading sources:', error)
+    }
+  }, [hasLoadedSources])
+
+  // Load destinations only when needed
+  const loadDestinations = useCallback(async () => {
+    if (hasLoadedDestinations) return
+    try {
+      const destinationsData = await cachedFetch('/api/destinations')
+      setDestinations(destinationsData as Destination[])
+      setHasLoadedDestinations(true)
+    } catch (error) {
+      console.error('Error loading destinations:', error)
+    }
+  }, [hasLoadedDestinations])
+
+  // Load stats only when needed
+  const loadStats = useCallback(async () => {
+    if (hasLoadedStats) return
+    try {
+      const statsData = await loadDistanceStats()
+      setDistanceStats(statsData)
+      setHasLoadedStats(true)
+    } catch (error) {
+      console.error('Error loading stats:', error)
+    }
+  }, [hasLoadedStats])
+
+  // Load minimal initial data - only stats for sidebar
+  const loadInitialData = useCallback(async () => {
+    setIsInitialLoading(true)
+    try {
+      await loadStats()
+    } catch (error) {
+      console.error('Error loading initial data:', error)
+    } finally {
+      setIsInitialLoading(false)
+    }
+  }, [loadStats])
+
+  // Load initial section data after stats are loaded
+  useEffect(() => {
+    const loadInitialSectionData = async () => {
+      if (!isInitialLoading && activeSection === 'calculator') {
+        await Promise.all([loadSources(), loadDestinations()])
+      }
+    }
+    loadInitialSectionData()
+  }, [isInitialLoading, activeSection, loadSources, loadDestinations])
 
   // Efficient update functions
   const addSource = (newSource: Source) => {
@@ -204,37 +251,71 @@ export default function AppPage() {
   // Refresh only distances (when user explicitly calculates)
   const refreshDistances = async () => {
     try {
-      const distancesData = await cachedFetch('/api/distances')
-      setDistances(distancesData as Distance[])
+      // Clear distances cache and reload stats
+      queryCache.delete('/api/distances')
+      const [statsData] = await Promise.all([
+        loadDistanceStats()
+      ])
+      setDistanceStats(statsData)
+
+      // If we're on the distances section, refresh the current page
+      if (activeSection === 'distances') {
+        await loadDistancesPage(currentDistancePage)
+      }
     } catch (error) {
-      console.error('Error loading distances:', error)
+      console.error('Error refreshing distances:', error)
     }
   }
 
   // Refresh data and clear cache
   const refreshData = async () => {
     clearCache()
-    await loadData()
-  }
+    setHasLoadedSources(false)
+    setHasLoadedDestinations(false)
+    setHasLoadedStats(false)
+    await loadInitialData()
 
-  useEffect(() => {
-    loadData()
-  }, [loadData]) // Now properly depends on loadData
-
-  // Handle section change - load distances only when needed
-  const handleSectionChange = (section: 'calculator' | 'distances' | 'manage') => {
-    setActiveSection(section)
-    if (section === 'distances' && distances.length === 0) {
-      loadDistancesPage(1)
+    // Reload current section data
+    if (activeSection === 'calculator' || activeSection === 'manage') {
+      await Promise.all([loadSources(), loadDestinations()])
+    } else if (activeSection === 'distances') {
+      await loadDistancesPage(currentDistancePage)
     }
   }
 
-  // Calculate statistics for sidebar
-  const totalDistances = distanceStats.calculatedDistances || distances.length
-  const uniqueSources = new Set(distances.map(d => d.source.id)).size
-  const uniqueDestinations = destinations.length || 0
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData]) // Load initial data only once
 
-  if (isLoading) {
+  // Handle section change - load data only when switching to a section that needs it
+  const handleSectionChange = async (section: 'calculator' | 'distances' | 'manage') => {
+    setActiveSection(section)
+
+    // Load required data based on section
+    if (section === 'calculator') {
+      // Calculator needs sources and destinations for dropdowns
+      await Promise.all([loadSources(), loadDestinations()])
+    } else if (section === 'distances') {
+      // Distance matrix needs distances data
+      if (distances.length === 0) {
+        try {
+          await loadDistancesPage(1)
+        } catch (error) {
+          console.error('Error loading distances on section change:', error)
+        }
+      }
+    } else if (section === 'manage') {
+      // Manage section needs sources and destinations
+      await Promise.all([loadSources(), loadDestinations()])
+    }
+  }
+
+  // Calculate statistics for sidebar - use loaded data or defaults
+  const totalDistances = distanceStats.calculatedDistances || 0
+  const uniqueSources = distanceStats.sources || 0
+  const uniqueDestinations = distanceStats.destinations || 0
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -286,44 +367,71 @@ export default function AppPage() {
 
             {/* Content based on active section */}
             {activeSection === 'calculator' && (
-              <Calculator
-                sources={sources}
-                destinations={destinations}
-                distances={distances}
-                calculatedCount={distanceStats.calculatedDistances}
-                onRefresh={refreshDistances}
-                onSourceAdded={addSource}
-                onDestinationAdded={addDestination}
-              />
+              <>
+                {(!hasLoadedSources || !hasLoadedDestinations) ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <div className="text-sm text-gray-600">Loading calculator data...</div>
+                  </div>
+                ) : (
+                  <Calculator
+                    sources={sources}
+                    destinations={destinations}
+                    distances={distances}
+                    calculatedCount={distanceStats.calculatedDistances}
+                    onRefresh={refreshDistances}
+                    onSourceAdded={addSource}
+                    onDestinationAdded={addDestination}
+                  />
+                )}
+              </>
             )}
 
             {activeSection === 'distances' && (
               <div>
-                <DistanceMatrix
-                  distances={distances}
-                  pagination={distancePagination}
-                  currentPage={currentDistancePage}
-                  onPageChange={loadDistancesPage}
-                />
-                {distanceStats.calculatedDistances > 0 && (
-                  <div className="mt-4 text-sm text-gray-600">
-                    Showing {distances.length} of {distanceStats.calculatedDistances} total distances
-                    {distancePagination.total && (
-                      <span> • Page {currentDistancePage} of {distancePagination.pages}</span>
-                    )}
+                {isLoadingDistances ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <div className="text-sm text-gray-600">Loading distances...</div>
                   </div>
+                ) : (
+                  <>
+                    <DistanceMatrix
+                      distances={distances}
+                      pagination={distancePagination}
+                      currentPage={currentDistancePage}
+                      onPageChange={loadDistancesPage}
+                    />
+                    {/* {distanceStats.calculatedDistances > 0 && (
+                      <div className="mt-4 text-sm text-gray-600">
+                        Showing {distances.length} of {distanceStats.calculatedDistances} total distances
+                        {distancePagination.total && (
+                          <span> • Page {currentDistancePage} of {distancePagination.pages}</span>
+                        )}
+                      </div>
+                    )} */}
+                  </>
                 )}
               </div>
             )}
 
             {activeSection === 'manage' && (
-              <ManageData
-                sources={sources}
-                destinations={destinations}
-                onRefresh={refreshData}
-                onSourceDeleted={removeSource}
-                onDestinationDeleted={removeDestination}
-              />
+              <>
+                {(!hasLoadedSources || !hasLoadedDestinations) ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <div className="text-sm text-gray-600">Loading management data...</div>
+                  </div>
+                ) : (
+                  <ManageData
+                    sources={sources}
+                    destinations={destinations}
+                    onRefresh={refreshData}
+                    onSourceDeleted={removeSource}
+                    onDestinationDeleted={removeDestination}
+                  />
+                )}
+              </>
             )}
           </div>
         </main>

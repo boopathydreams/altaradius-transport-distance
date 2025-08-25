@@ -81,7 +81,9 @@ async function getExistingDistances(page: number = 1, limit: number = 1000) { //
         destinationId: true,
         distance: true,
         duration: true,
-        // Exclude large fields like 'route' and 'directionsUrl' to reduce size
+        directionsUrl: true,
+        createdAt: true,
+        // Exclude large fields like 'route' to reduce size but keep directionsUrl and createdAt
         source: {
           select: {
             id: true,
