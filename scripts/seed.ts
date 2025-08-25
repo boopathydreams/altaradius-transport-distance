@@ -68,7 +68,7 @@ async function main() {
         password: hashedPassword,
       },
     })
-    console.log('✅ Created admin user (username: admin, password: admin123)')
+    console.log('✅ Created admin user (username: vignesh, password: vignesh@vat)')
 
     // Read and parse sources CSV
     const sourcesPath = join(process.cwd(), 'data', 'sources.csv')

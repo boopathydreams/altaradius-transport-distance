@@ -48,6 +48,7 @@ interface CalculatorProps {
   sources: Source[]
   destinations: Destination[]
   distances: Distance[]
+  calculatedCount?: number // Optional prop for calculated routes count
   onRefresh: () => void
   onSourceAdded?: (newSource: Source) => void
   onDestinationAdded?: (newDestination: Destination) => void
@@ -63,6 +64,7 @@ export default function Calculator({
   sources,
   destinations,
   distances,
+  calculatedCount,
   onRefresh,
   onSourceAdded,
   onDestinationAdded
@@ -360,7 +362,7 @@ export default function Calculator({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-600 font-medium text-sm">Calculated Routes</p>
-                <p className="text-2xl font-bold text-green-700">{distances.length}</p>
+                <p className="text-2xl font-bold text-green-700">{calculatedCount ?? distances.length}</p>
               </div>
               <ChartBarIcon className="h-8 w-8 text-green-500" />
             </div>

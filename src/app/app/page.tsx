@@ -71,27 +71,6 @@ const cachedFetch = async (url: string): Promise<Source[] | Destination[] | Dist
   return data
 }
 
-// Function to load distances with proper pagination (only current page)
-const loadDistancePage = async (page: number = 1, limit: number = 50): Promise<{ distances: Distance[], pagination: any }> => {
-  try {
-    const response = await fetch(`/api/distances?page=${page}&limit=${limit}`)
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-    console.log(`Loaded distances page ${page}: ${data.distances?.length || 0} distances`)
-
-    return {
-      distances: data.distances || [],
-      pagination: data.pagination || {}
-    }
-  } catch (error) {
-    console.error(`Error loading distances page ${page}:`, error)
-    return { distances: [], pagination: {} }
-  }
-}
-
 // Function to get distance statistics/count only
 const loadDistanceStats = async () => {
   try {
@@ -126,6 +105,27 @@ interface PaginationInfo {
   hasMore: boolean
 }
 
+// Function to load distances with proper pagination (only current page)
+const loadDistancePage = async (page: number = 1, limit: number = 50): Promise<{ distances: Distance[], pagination: PaginationInfo }> => {
+  try {
+    const response = await fetch(`/api/distances?page=${page}&limit=${limit}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log(`Loaded distances page ${page}: ${data.distances?.length || 0} distances`)
+
+    return {
+      distances: data.distances || [],
+      pagination: data.pagination || {} as PaginationInfo
+    }
+  } catch (error) {
+    console.error(`Error loading distances page ${page}:`, error)
+    return { distances: [], pagination: {} as PaginationInfo }
+  }
+}
+
 export default function AppPage() {
   const [sources, setSources] = useState<Source[]>([])
   const [destinations, setDestinations] = useState<Destination[]>([])
@@ -142,6 +142,18 @@ export default function AppPage() {
     queryCache.clear()
     console.log('Cache cleared')
   }
+
+  // Load specific page of distances
+  const loadDistancesPage = useCallback(async (page: number) => {
+    try {
+      const { distances: pageDistances, pagination } = await loadDistancePage(page, 50)
+      setDistances(pageDistances)
+      setDistancePagination(pagination)
+      setCurrentDistancePage(page)
+    } catch (error) {
+      console.error('Error loading distances page:', error)
+    }
+  }, [])
 
   // Load initial data efficiently
   const loadData = useCallback(async () => {
@@ -166,19 +178,7 @@ export default function AppPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [activeSection])
-
-  // Load specific page of distances
-  const loadDistancesPage = useCallback(async (page: number) => {
-    try {
-      const { distances: pageDistances, pagination } = await loadDistancePage(page, 50)
-      setDistances(pageDistances)
-      setDistancePagination(pagination)
-      setCurrentDistancePage(page)
-    } catch (error) {
-      console.error('Error loading distances page:', error)
-    }
-  }, [])
+  }, [activeSection, loadDistancesPage])
 
   // Efficient update functions
   const addSource = (newSource: Source) => {
@@ -232,7 +232,7 @@ export default function AppPage() {
   // Calculate statistics for sidebar
   const totalDistances = distanceStats.calculatedDistances || distances.length
   const uniqueSources = new Set(distances.map(d => d.source.id)).size
-  const uniqueDestinations = new Set(distances.map(d => d.destination.id)).size
+  const uniqueDestinations = destinations.length || 0
 
   if (isLoading) {
     return (
@@ -290,6 +290,7 @@ export default function AppPage() {
                 sources={sources}
                 destinations={destinations}
                 distances={distances}
+                calculatedCount={distanceStats.calculatedDistances}
                 onRefresh={refreshDistances}
                 onSourceAdded={addSource}
                 onDestinationAdded={addDestination}
