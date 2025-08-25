@@ -117,7 +117,7 @@ export default function SearchableSelect({
     setFocusedIndex(-1)
   }
 
-  const handleClear = (e: React.MouseEvent) => {
+  const handleClear = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation()
     onChange('')
     setIsOpen(false)
@@ -182,17 +182,25 @@ export default function SearchableSelect({
           </div>
 
           <div className="flex items-center space-x-1 ml-2">
-            {/* Clear Button */}
+            {/* Clear Button - using div to avoid nested button issue */}
             {selectedOption && !disabled && (
-              <button
+              <div
                 onClick={handleClear}
-                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 title="Clear selection"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleClear(e)
+                  }
+                }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </div>
             )}
 
             {/* Dropdown Arrow */}
@@ -271,11 +279,11 @@ export default function SearchableSelect({
                               📍 {option.latitude.toFixed(4)}, {option.longitude.toFixed(4)}
                             </div>
                           )}
-                          {option.address && (
+                          {/* {option.address && (
                             <div className="text-xs text-slate-500 truncate">
                               📍 {option.address}
                             </div>
-                          )}
+                          )} */}
                         </div>
                       </div>
 

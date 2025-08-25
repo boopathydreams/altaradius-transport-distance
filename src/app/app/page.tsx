@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../../components/Sidebar'
 import Calculator from '../../components/Calculator'
 import DistanceMatrix from '../../components/DistanceMatrix'
@@ -59,56 +59,80 @@ const cachedFetch = async (url: string): Promise<Source[] | Destination[] | Dist
   }
 
   const data = await response.json()
-  
+
   // Handle paginated distances response
   if (url.includes('/api/distances') && data.distances && data.pagination) {
     console.log(`Loaded page ${data.pagination.page} of ${data.pagination.pages} (${data.distances.length} distances)`)
     queryCache.set(cacheKey, { data: data.distances, timestamp: now })
     return data.distances
   }
-  
+
   queryCache.set(cacheKey, { data, timestamp: now })
   return data
 }
 
-// Function to load all distances with pagination
-const loadAllDistances = async (): Promise<Distance[]> => {
-  const allDistances: Distance[] = []
-  let page = 1
-  let hasMore = true
-  
-  while (hasMore) {
-    try {
-      const response = await fetch(`/api/distances?page=${page}&limit=1000`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      
-      if (data.distances) {
-        allDistances.push(...data.distances)
-        hasMore = data.pagination?.hasMore || false
-        page++
-        
-        console.log(`Loaded page ${page - 1}: ${data.distances.length} distances, total so far: ${allDistances.length}`)
-      } else {
-        hasMore = false
-      }
-    } catch (error) {
-      console.error(`Error loading distances page ${page}:`, error)
-      hasMore = false
+// Function to load distances with proper pagination (only current page)
+const loadDistancePage = async (page: number = 1, limit: number = 50): Promise<{ distances: Distance[], pagination: any }> => {
+  try {
+    const response = await fetch(`/api/distances?page=${page}&limit=${limit}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
+
+    const data = await response.json()
+    console.log(`Loaded distances page ${page}: ${data.distances?.length || 0} distances`)
+
+    return {
+      distances: data.distances || [],
+      pagination: data.pagination || {}
+    }
+  } catch (error) {
+    console.error(`Error loading distances page ${page}:`, error)
+    return { distances: [], pagination: {} }
   }
-  
-  console.log(`Finished loading all distances: ${allDistances.length} total`)
-  return allDistances
+}
+
+// Function to get distance statistics/count only
+const loadDistanceStats = async () => {
+  try {
+    const response = await fetch('/api/distances/stats')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const stats = await response.json()
+    console.log('Distance stats:', stats)
+    return stats
+  } catch (error) {
+    console.error('Error loading distance stats:', error)
+    return { total: 0, sources: 0, destinations: 0 }
+  }
+}
+
+interface DistanceStats {
+  calculatedDistances: number
+  sources: number
+  destinations: number
+  totalPossibleDistances: number
+  missingDistances: number
+  completionPercentage: number
+}
+
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  pages: number
+  hasMore: boolean
 }
 
 export default function AppPage() {
   const [sources, setSources] = useState<Source[]>([])
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [distances, setDistances] = useState<Distance[]>([])
+  const [distanceStats, setDistanceStats] = useState<DistanceStats>({} as DistanceStats)
+  const [distancePagination, setDistancePagination] = useState<PaginationInfo>({} as PaginationInfo)
+  const [currentDistancePage, setCurrentDistancePage] = useState(1)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeSection, setActiveSection] = useState<'calculator' | 'distances' | 'manage'>('calculator')
   const [isLoading, setIsLoading] = useState(true)
@@ -119,25 +143,42 @@ export default function AppPage() {
     console.log('Cache cleared')
   }
 
-  // Load data with caching
-  const loadData = async () => {
+  // Load initial data efficiently
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [sourcesData, destinationsData, distancesData] = await Promise.all([
+      const [sourcesData, destinationsData, statsData] = await Promise.all([
         cachedFetch('/api/sources'),
         cachedFetch('/api/destinations'),
-        loadAllDistances() // Use new paginated function for distances
+        loadDistanceStats() // Only get stats, not all distances
       ])
 
       setSources(sourcesData as Source[])
       setDestinations(destinationsData as Destination[])
-      setDistances(distancesData as Distance[])
+      setDistanceStats(statsData)
+
+      // Load only first page of distances for the distance matrix view
+      if (activeSection === 'distances') {
+        await loadDistancesPage(1)
+      }
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [activeSection])
+
+  // Load specific page of distances
+  const loadDistancesPage = useCallback(async (page: number) => {
+    try {
+      const { distances: pageDistances, pagination } = await loadDistancePage(page, 50)
+      setDistances(pageDistances)
+      setDistancePagination(pagination)
+      setCurrentDistancePage(page)
+    } catch (error) {
+      console.error('Error loading distances page:', error)
+    }
+  }, [])
 
   // Efficient update functions
   const addSource = (newSource: Source) => {
@@ -178,10 +219,18 @@ export default function AppPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData]) // Now properly depends on loadData
+
+  // Handle section change - load distances only when needed
+  const handleSectionChange = (section: 'calculator' | 'distances' | 'manage') => {
+    setActiveSection(section)
+    if (section === 'distances' && distances.length === 0) {
+      loadDistancesPage(1)
+    }
+  }
 
   // Calculate statistics for sidebar
-  const totalDistances = distances.length
+  const totalDistances = distanceStats.calculatedDistances || distances.length
   const uniqueSources = new Set(distances.map(d => d.source.id)).size
   const uniqueDestinations = new Set(distances.map(d => d.destination.id)).size
 
@@ -203,7 +252,7 @@ export default function AppPage() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
         distanceCount={totalDistances}
         sourceCount={uniqueSources}
         destinationCount={uniqueDestinations}
@@ -248,9 +297,22 @@ export default function AppPage() {
             )}
 
             {activeSection === 'distances' && (
-              <DistanceMatrix
-                distances={distances}
-              />
+              <div>
+                <DistanceMatrix
+                  distances={distances}
+                  pagination={distancePagination}
+                  currentPage={currentDistancePage}
+                  onPageChange={loadDistancesPage}
+                />
+                {distanceStats.calculatedDistances > 0 && (
+                  <div className="mt-4 text-sm text-gray-600">
+                    Showing {distances.length} of {distanceStats.calculatedDistances} total distances
+                    {distancePagination.total && (
+                      <span> • Page {currentDistancePage} of {distancePagination.pages}</span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {activeSection === 'manage' && (

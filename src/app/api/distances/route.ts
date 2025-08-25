@@ -63,14 +63,14 @@ export async function GET(request: NextRequest) {
 // Fast function to get existing distances without calculation
 async function getExistingDistances(page: number = 1, limit: number = 1000) { // Back to safe limit
   console.log(`Fetching existing distances - Page: ${page}, Limit: ${limit}`)
-  
+
   const skip = (page - 1) * limit
-  
+
   try {
     // Get total count first for pagination info
     const totalCount = await prisma.distance.count()
     console.log(`Total distances in DB: ${totalCount}, requesting ${limit} starting from ${skip}`)
-    
+
     // Get existing distances with minimal data to reduce response size
     const distances = await prisma.distance.findMany({
       skip,
@@ -109,7 +109,7 @@ async function getExistingDistances(page: number = 1, limit: number = 1000) { //
     })
 
     console.log(`Found ${distances.length} existing distances`)
-    
+
     return NextResponse.json({
       distances,
       pagination: {

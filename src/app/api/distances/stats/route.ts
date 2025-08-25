@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const totalPossibleDistances = sourceCount * destinationCount
     const missingDistances = totalPossibleDistances - distanceCount
-    const completionPercentage = totalPossibleDistances > 0 ? 
+    const completionPercentage = totalPossibleDistances > 0 ?
       Math.round((distanceCount / totalPossibleDistances) * 100) : 0
 
     const stats = {

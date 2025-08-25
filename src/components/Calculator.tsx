@@ -85,31 +85,49 @@ export default function Calculator({
 
   // Check for existing distance when source/destination changes
   useEffect(() => {
-    if (selectedSourceId && selectedDestinationId && distances.length > 0) {
-      const existingDistance = distances.find(d =>
-        d.source.id.toString() === selectedSourceId &&
-        d.destination.id.toString() === selectedDestinationId
-      )
-
-      if (existingDistance) {
-        setResult({
-          type: 'success',
-          distance: existingDistance
-        })
+    const checkExistingDistance = async () => {
+      if (selectedSourceId && selectedDestinationId) {
+        try {
+          const response = await fetch(`/api/distances/check?sourceId=${selectedSourceId}&destinationId=${selectedDestinationId}`)
+          if (response.ok) {
+            const data = await response.json()
+            if (data.exists && data.distance) {
+              console.log('Found existing distance:', data.distance)
+              setResult({
+                type: 'success',
+                distance: data.distance
+              })
+            } else {
+              console.log('No existing distance found')
+              setResult(null)
+            }
+          } else {
+            console.error('Error checking existing distance:', response.status)
+            setResult(null)
+          }
+        } catch (error) {
+          console.error('Error checking existing distance:', error)
+          setResult(null)
+        }
       } else {
         setResult(null)
       }
-    } else {
-      setResult(null)
     }
-  }, [selectedSourceId, selectedDestinationId, distances])
 
-  // Helper to check if route already exists
-  const existingRoute = selectedSourceId && selectedDestinationId ?
-    distances.find(d =>
-      d.source.id.toString() === selectedSourceId &&
-      d.destination.id.toString() === selectedDestinationId
-    ) : null
+    checkExistingDistance()
+  }, [selectedSourceId, selectedDestinationId])
+
+  // Helper to check if route already exists (now uses API)
+  const [existingRoute, setExistingRoute] = useState<Distance | null>(null)
+
+  // Update existing route when result changes
+  useEffect(() => {
+    if (result && result.type === 'success' && result.distance) {
+      setExistingRoute(result.distance)
+    } else {
+      setExistingRoute(null)
+    }
+  }, [result])
 
   const handleCalculateDistance = async () => {
     setIsLoading(true)
@@ -136,7 +154,7 @@ export default function Calculator({
       const response = await fetch(`/api/calculate?${params}`, {
         method: 'POST'
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         if (selectedSourceId && selectedDestinationId && Array.isArray(data) && data.length > 0) {

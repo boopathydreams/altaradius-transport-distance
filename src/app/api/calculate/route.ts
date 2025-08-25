@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       return await calculateDistancesFromSource(parseInt(sourceId))
     }
 
-    // Destination-specific calculation  
+    // Destination-specific calculation
     if (destinationId) {
       return await calculateDistancesToDestination(parseInt(destinationId))
     }
@@ -290,21 +290,21 @@ async function calculateDistancesToDestination(destinationId: number) {
 // Limited batch calculation to avoid timeouts
 async function calculateBatchDistances() {
   const BATCH_SIZE = 20 // Process max 20 missing distances per request
-  
+
   // Find missing distances (where combinations don't exist)
   const sources = await prisma.source.findMany({
     select: { id: true },
     take: 10, // Limit sources for timeout prevention
     orderBy: { name: 'asc' }
   })
-  
+
   const destinations = await prisma.destination.findMany({
     where: {
       latitude: { not: null },
       longitude: { not: null },
     },
     select: { id: true },
-    take: 10, // Limit destinations for timeout prevention  
+    take: 10, // Limit destinations for timeout prevention
     orderBy: { name: 'asc' }
   })
 
@@ -342,7 +342,7 @@ async function calculateBatchDistances() {
         const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/calculate?sourceId=${source.id}&destinationId=${destination.id}`, {
           method: 'POST'
         })
-        
+
         if (response.ok) {
           const [newDistance] = await response.json()
           if (newDistance) {

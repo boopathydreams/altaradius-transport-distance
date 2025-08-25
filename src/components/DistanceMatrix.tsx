@@ -34,17 +34,33 @@ interface Distance {
   createdAt: string
 }
 
-interface DistanceMatrixProps {
-  distances: Distance[]
+interface PaginationInfo {
+  page: number
+  limit: number
+  total: number
+  pages: number
+  hasMore: boolean
 }
 
-export default function DistanceMatrix({ distances }: DistanceMatrixProps) {
+interface DistanceMatrixProps {
+  distances: Distance[]
+  pagination?: PaginationInfo
+  currentPage?: number
+  onPageChange?: (page: number) => void
+}
+
+export default function DistanceMatrix({
+  distances,
+  pagination,
+  currentPage = 1,
+  onPageChange
+}: DistanceMatrixProps) {
   const [sourceSearch, setSourceSearch] = useState('')
   const [destinationSearch, setDestinationSearch] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(50)
+  // Remove client-side pagination state since we use server-side now
+  const [itemsPerPage] = useState(50)
 
-  // Filter distances based on search terms
+  // Filter distances based on search terms (client-side filtering of current page)
   const filteredDistances = useMemo(() => {
     return distances.filter(distance =>
       distance.source.name.toLowerCase().includes(sourceSearch.toLowerCase()) &&
@@ -52,12 +68,10 @@ export default function DistanceMatrix({ distances }: DistanceMatrixProps) {
     )
   }, [distances, sourceSearch, destinationSearch])
 
-  // Calculate pagination
-  const totalItems = filteredDistances.length
-  const totalPages = Math.ceil(totalItems / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedDistances = filteredDistances.slice(startIndex, endIndex)
+  // Use server-side pagination data
+  const totalItems = pagination?.total || filteredDistances.length
+  const totalPages = pagination?.pages || 1
+  const paginatedDistances = filteredDistances // All distances from current page
 
   // Analytics calculations
   const analytics = useMemo(() => {
@@ -85,19 +99,25 @@ export default function DistanceMatrix({ distances }: DistanceMatrixProps) {
     }
   }, [filteredDistances])
 
-  // Reset page when filters change
+  // Reset page when filters change (for server-side pagination, notify parent)
   useEffect(() => {
-    setCurrentPage(1)
-  }, [sourceSearch, destinationSearch, itemsPerPage])
+    if (onPageChange && currentPage !== 1) {
+      onPageChange(1)
+    }
+  }, [sourceSearch, destinationSearch, onPageChange, currentPage])
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+    if (onPageChange && page !== currentPage) {
+      onPageChange(Math.max(1, Math.min(page, totalPages)))
+    }
   }
 
   const clearFilters = () => {
     setSourceSearch('')
     setDestinationSearch('')
-    setCurrentPage(1)
+    if (onPageChange && currentPage !== 1) {
+      onPageChange(1)
+    }
   }
 
   if (distances.length === 0) {
@@ -281,18 +301,18 @@ export default function DistanceMatrix({ distances }: DistanceMatrixProps) {
                     <div className="text-gray-500 text-xs">
                       {distance.source.latitude.toFixed(4)}, {distance.source.longitude.toFixed(4)}
                     </div>
-                    {distance.source.address && (
+                    {/* {distance.source.address && (
                       <div className="text-gray-400 text-xs truncate max-w-xs">{distance.source.address}</div>
-                    )}
+                    )} */}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="font-medium text-gray-900">{distance.destination.name}</div>
                     {distance.destination.pincode && (
                       <div className="text-gray-500 text-xs">PIN: {distance.destination.pincode}</div>
                     )}
-                    {distance.destination.address && (
+                    {/* {distance.destination.address && (
                       <div className="text-gray-400 text-xs truncate max-w-xs">{distance.destination.address}</div>
-                    )}
+                    )} */}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-semibold text-gray-900">{distance.distance.toFixed(1)} km</span>
@@ -341,25 +361,13 @@ export default function DistanceMatrix({ distances }: DistanceMatrixProps) {
       <div className="bg-white rounded-lg shadow p-4 flex-shrink-0">
         <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
           <div className="text-sm text-gray-700">
-            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} results
+            Showing page {currentPage} of {totalPages} • {paginatedDistances.length} distances on this page • {totalItems} total
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Items per page selector */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700">Show:</span>
-              <select
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-                <option value={500}>500</option>
-              </select>
-              <span className="text-sm text-gray-700">per page</span>
+            {/* Note: Items per page is controlled by server now */}
+            <div className="text-sm text-gray-500">
+              {itemsPerPage} per page
             </div>
 
             {/* Navigation controls */}
