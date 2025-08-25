@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(destination, { status: 201 })
   } catch (error) {
     console.error('Error creating destination:', error)
-    
+
     // Check if it's a Prisma unique constraint error
     if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       )
     }
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

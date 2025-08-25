@@ -24,7 +24,7 @@ export function WebVitals() {
     }
 
     // Example: Send to custom analytics endpoint
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'development') {
       fetch('/api/analytics/web-vitals', {
         method: 'POST',
         headers: {

@@ -4,65 +4,34 @@ const prisma = new PrismaClient()
 
 async function fixSequences() {
   try {
-    console.log('Fixing PostgreSQL sequences...')
+    console.log('Fixing all sequences...')
 
-    // Fix Source table sequence
-    const maxSourceId = await prisma.$queryRaw<[{ max: number }]>`
-      SELECT MAX(id) as max FROM "Source"
-    `
-    const sourceMaxId = maxSourceId[0]?.max || 0
+    const tables = ['Source', 'Destination', 'Distance', 'User']
     
-    if (sourceMaxId > 0) {
-      await prisma.$executeRaw`
-        SELECT setval('Source_id_seq', ${sourceMaxId}, true)
-      `
-      console.log(`Fixed Source sequence to ${sourceMaxId}`)
+    for (const table of tables) {
+      try {
+        // Get max ID for current table using dynamic query
+        const maxIdQuery = `SELECT MAX(id) as max FROM "${table}"`
+        const result = await prisma.$queryRawUnsafe<[{ max: number }]>(maxIdQuery)
+        const maxId = result[0]?.max || 0
+
+        if (maxId > 0) {
+          // Fix sequence to next available ID
+          const sequenceQuery = `SELECT setval(pg_get_serial_sequence('public."${table}"', 'id'), ${maxId + 1}, false)`
+          await prisma.$queryRawUnsafe(sequenceQuery)
+          console.log(`✅ Fixed ${table} sequence to ${maxId + 1}`)
+        } else {
+          console.log(`⚠️  ${table} table is empty, skipping`)
+        }
+      } catch (error) {
+        console.error(`❌ Error fixing ${table} sequence:`, error instanceof Error ? error.message : String(error))
+      }
     }
 
-    // Fix Destination table sequence
-    const maxDestinationId = await prisma.$queryRaw<[{ max: number }]>`
-      SELECT MAX(id) as max FROM "Destination"
-    `
-    const destinationMaxId = maxDestinationId[0]?.max || 0
-    
-    if (destinationMaxId > 0) {
-      await prisma.$executeRaw`
-        SELECT setval('Destination_id_seq', ${destinationMaxId}, true)
-      `
-      console.log(`Fixed Destination sequence to ${destinationMaxId}`)
-    }
-
-    // Fix Distance table sequence
-    const maxDistanceId = await prisma.$queryRaw<[{ max: number }]>`
-      SELECT MAX(id) as max FROM "Distance"
-    `
-    const distanceMaxId = maxDistanceId[0]?.max || 0
-    
-    if (distanceMaxId > 0) {
-      await prisma.$executeRaw`
-        SELECT setval('Distance_id_seq', ${distanceMaxId}, true)
-      `
-      console.log(`Fixed Distance sequence to ${distanceMaxId}`)
-    }
-
-    // Fix User table sequence
-    const maxUserId = await prisma.$queryRaw<[{ max: number }]>`
-      SELECT MAX(id) as max FROM "User"
-    `
-    const userMaxId = maxUserId[0]?.max || 0
-    
-    if (userMaxId > 0) {
-      await prisma.$executeRaw`
-        SELECT setval('User_id_seq', ${userMaxId}, true)
-      `
-      console.log(`Fixed User sequence to ${userMaxId}`)
-    }
-
-    console.log('All sequences fixed successfully!')
+    console.log('All sequences processed!')
 
   } catch (error) {
-    console.error('Error fixing sequences:', error)
-    throw error
+    console.error('Error:', error instanceof Error ? error.message : String(error))
   } finally {
     await prisma.$disconnect()
   }
@@ -71,7 +40,7 @@ async function fixSequences() {
 if (require.main === module) {
   fixSequences()
     .catch(error => {
-      console.error('Script failed:', error)
+      console.error('Failed:', error instanceof Error ? error.message : String(error))
       process.exit(1)
     })
 }
