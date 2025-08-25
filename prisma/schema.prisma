@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Source {
+  id          Int      @id @default(autoincrement())
+  name        String
+  latitude    Float
+  longitude   Float
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations for distance calculations
+  distancesFrom Distance[] @relation("SourceDistances")
+}
+
+model Destination {
+  id          Int      @id @default(autoincrement())
+  name        String
+  pincode     String?
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations for distance calculations
+  distancesTo Distance[] @relation("DestinationDistances")
+}
+
+model Distance {
+  id            Int      @id @default(autoincrement())
+  sourceId      Int
+  destinationId Int
+  distance      Float    // Distance in kilometers
+  duration      Float?   // Duration in minutes
+  route         String?  // JSON string of route details
+  directionsUrl String?  // Google Maps directions URL
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  source      Source      @relation("SourceDistances", fields: [sourceId], references: [id], onDelete: Cascade)
+  destination Destination @relation("DestinationDistances", fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, destinationId])
+}
