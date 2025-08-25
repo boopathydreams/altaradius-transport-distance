@@ -227,7 +227,7 @@ export default function SearchableSelect({
               <input
                 ref={searchInputRef}
                 type="text"
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="w-full text-gray-900 pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 placeholder={`Search ${placeholder.toLowerCase()}...`}
                 value={searchTerm}
                 onChange={(e) => {

@@ -255,21 +255,12 @@ export default function DistanceMatrix({
       </section>
 
       {/* Distance Matrix Table - Flexible Height */}
-      <section className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0 mb-4 relative" aria-labelledby="distance-table-heading">
+      <section className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col min-h-0 mb-4" aria-labelledby="distance-table-heading">
         <h2 id="distance-table-heading" className="sr-only">Distance Matrix Table</h2>
 
-        {/* Loading Overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10 backdrop-blur-sm">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-              <div className="text-sm text-gray-600 font-medium">Searching...</div>
-            </div>
-          </div>
-        )}
-
-        <div className={`overflow-x-auto overflow-y-auto flex-1 ${isLoading ? 'opacity-50' : ''}`}>
+        <div className="overflow-x-auto overflow-y-auto flex-1">
           <table className="min-w-full divide-y divide-gray-200" role="table" aria-label="Distance calculations between sources and destinations">
+            {/* Table Header - Always visible and static */}
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -324,7 +315,23 @@ export default function DistanceMatrix({
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+
+            {/* Table Body - This area shows loading state during filtering */}
+            <tbody className={`bg-white divide-y divide-gray-200 relative ${isLoading ? 'opacity-50' : ''}`}>
+              {/* Loading state overlay only for tbody */}
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className="relative">
+                    <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10 backdrop-blur-sm">
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                        <div className="text-sm text-gray-600 font-medium">Searching...</div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
               {filteredDistances.length === 0 && hasActiveFilters ? (
                 // Empty state for when filters are active but no results found
                 <tr>
@@ -400,7 +407,7 @@ export default function DistanceMatrix({
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
                         >
                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 13l-6-3m6 3V4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 013.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 13l-6-3m6 3V4" />
                           </svg>
                           Directions
                         </a>

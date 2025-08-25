@@ -35,7 +35,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
   const handleDeleteSource = async (id: number) => {
     const source = sources.find(s => s.id === id)
     const sourceName = source ? source.name : `Source #${id}`
-    
+
     if (!confirm(`Are you sure you want to delete "${sourceName}"?\n\nThis will also delete ALL related distance calculations.\n\nThis action cannot be undone.`)) {
       return
     }
@@ -54,7 +54,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
         } else {
           onRefresh()
         }
-        
+
         // Show success message with details
         alert(`Successfully deleted "${result.sourceName}" and ${result.deletedDistances} related distance calculations.`)
       } else {
@@ -72,7 +72,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
   const handleDeleteDestination = async (id: number) => {
     const destination = destinations.find(d => d.id === id)
     const destinationName = destination ? destination.name : `Destination #${id}`
-    
+
     if (!confirm(`Are you sure you want to delete "${destinationName}"?\n\nThis will also delete ALL related distance calculations.\n\nThis action cannot be undone.`)) {
       return
     }
@@ -91,7 +91,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
         } else {
           onRefresh()
         }
-        
+
         // Show success message with details
         alert(`Successfully deleted "${result.destinationName}" and ${result.deletedDistances} related distance calculations.`)
       } else {

@@ -40,7 +40,7 @@ export async function DELETE(
 
     console.log(`Deleted destination "${destination.name}" and ${relatedDistancesCount} related distances`)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Destination deleted successfully',
       deletedDistances: relatedDistancesCount,
       destinationName: destination.name
@@ -48,7 +48,7 @@ export async function DELETE(
 
   } catch (error) {
     console.error('Error deleting destination:', error)
-    
+
     // Check if it's a Prisma constraint error
     if (error instanceof Error && 'code' in error) {
       if (error.code === 'P2025') {
