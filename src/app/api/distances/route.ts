@@ -3,6 +3,16 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { calculateDistance, geocodeAddressWithFallbacks } from '@/lib/googleMaps'
 
+// Type definitions
+type DistanceCreateInput = {
+  sourceId: number
+  destinationId: number
+  distance: number
+  duration?: number
+  route?: string
+  directionsUrl?: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication
@@ -120,15 +130,17 @@ async function calculateSingleDistance(sourceId: number, destinationId: number) 
   console.log('Distance calculation succeeded, caching result')
 
   // Cache the result
+  const distanceData: DistanceCreateInput = {
+    sourceId,
+    destinationId,
+    distance: result.distance,
+    duration: result.duration,
+    route: result.route,
+    ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+  }
+
   const newDistance = await prisma.distance.create({
-    data: {
-      sourceId,
-      destinationId,
-      distance: result.distance,
-      duration: result.duration,
-      route: result.route,
-      ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
-    } as any,
+    data: distanceData,
     include: {
       source: true,
       destination: true,
@@ -175,15 +187,17 @@ async function calculateDistancesFromSource(sourceId: number) {
       )
 
       if (result) {
+        const distanceData: DistanceCreateInput = {
+          sourceId,
+          destinationId: destination.id,
+          distance: result.distance,
+          duration: result.duration,
+          route: result.route,
+          ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+        }
+
         distance = await prisma.distance.create({
-          data: {
-            sourceId,
-            destinationId: destination.id,
-            distance: result.distance,
-            duration: result.duration,
-            route: result.route,
-            ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
-          } as any,
+          data: distanceData,
           include: {
             source: true,
             destination: true,
@@ -235,15 +249,17 @@ async function calculateDistancesToDestination(destinationId: number) {
       )
 
       if (result) {
+        const distanceData: DistanceCreateInput = {
+          sourceId: source.id,
+          destinationId,
+          distance: result.distance,
+          duration: result.duration,
+          route: result.route,
+          ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+        }
+
         distance = await prisma.distance.create({
-          data: {
-            sourceId: source.id,
-            destinationId,
-            distance: result.distance,
-            duration: result.duration,
-            route: result.route,
-            ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
-          } as any,
+          data: distanceData,
           include: {
             source: true,
             destination: true,
@@ -301,15 +317,17 @@ async function calculateAllDistances() {
         )
 
         if (result) {
+          const distanceData: DistanceCreateInput = {
+            sourceId: source.id,
+            destinationId: destination.id,
+            distance: result.distance,
+            duration: result.duration,
+            route: result.route,
+            ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+          }
+
           distance = await prisma.distance.create({
-            data: {
-              sourceId: source.id,
-              destinationId: destination.id,
-              distance: result.distance,
-              duration: result.duration,
-              route: result.route,
-              ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
-            } as any,
+            data: distanceData,
             include: {
               source: true,
               destination: true,
@@ -338,19 +356,4 @@ async function calculateAllDistances() {
 
   console.log(`Completed: ${calculationCount} new distances calculated, ${results.length} total distances`)
   return NextResponse.json(results)
-}
-
-async function getAllExistingDistances() {
-  const distances = await prisma.distance.findMany({
-    include: {
-      source: true,
-      destination: true,
-    },
-    orderBy: [
-      { source: { name: 'asc' } },
-      { destination: { name: 'asc' } }
-    ],
-  })
-
-  return NextResponse.json(distances)
 }
