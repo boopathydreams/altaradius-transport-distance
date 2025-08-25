@@ -61,26 +61,46 @@ export async function GET(request: NextRequest) {
 }
 
 // Fast function to get existing distances without calculation
-async function getExistingDistances(page: number = 1, limit: number = 10000) { // Increased default limit
+async function getExistingDistances(page: number = 1, limit: number = 1000) { // Back to safe limit
   console.log(`Fetching existing distances - Page: ${page}, Limit: ${limit}`)
   
   const skip = (page - 1) * limit
   
-  // Safety check: limit max results to prevent memory issues
-  const safeLimit = Math.min(limit, 15000) // Max 15k records at once
-  
   try {
-    // Get total count first for logging
+    // Get total count first for pagination info
     const totalCount = await prisma.distance.count()
-    console.log(`Total distances in DB: ${totalCount}, requesting ${safeLimit} starting from ${skip}`)
+    console.log(`Total distances in DB: ${totalCount}, requesting ${limit} starting from ${skip}`)
     
-    // Get existing distances with pagination
+    // Get existing distances with minimal data to reduce response size
     const distances = await prisma.distance.findMany({
       skip,
-      take: safeLimit,
-      include: {
-        source: true,
-        destination: true,
+      take: limit,
+      select: {
+        id: true,
+        sourceId: true,
+        destinationId: true,
+        distance: true,
+        duration: true,
+        // Exclude large fields like 'route' and 'directionsUrl' to reduce size
+        source: {
+          select: {
+            id: true,
+            name: true,
+            latitude: true,
+            longitude: true,
+            address: true
+          }
+        },
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            pincode: true,
+            address: true,
+            latitude: true,
+            longitude: true
+          }
+        }
       },
       orderBy: [
         { source: { name: 'asc' } },
@@ -89,11 +109,21 @@ async function getExistingDistances(page: number = 1, limit: number = 10000) { /
     })
 
     console.log(`Found ${distances.length} existing distances`)
-    return NextResponse.json(distances)
+    
+    return NextResponse.json({
+      distances,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+        hasMore: skip + distances.length < totalCount
+      }
+    })
   } catch (error) {
     console.error('Error fetching existing distances:', error)
     return NextResponse.json(
-      { error: 'Error fetching distances' },
+      { error: 'Error fetching distances', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

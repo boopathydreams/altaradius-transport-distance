@@ -59,8 +59,50 @@ const cachedFetch = async (url: string): Promise<Source[] | Destination[] | Dist
   }
 
   const data = await response.json()
+  
+  // Handle paginated distances response
+  if (url.includes('/api/distances') && data.distances && data.pagination) {
+    console.log(`Loaded page ${data.pagination.page} of ${data.pagination.pages} (${data.distances.length} distances)`)
+    queryCache.set(cacheKey, { data: data.distances, timestamp: now })
+    return data.distances
+  }
+  
   queryCache.set(cacheKey, { data, timestamp: now })
   return data
+}
+
+// Function to load all distances with pagination
+const loadAllDistances = async (): Promise<Distance[]> => {
+  const allDistances: Distance[] = []
+  let page = 1
+  let hasMore = true
+  
+  while (hasMore) {
+    try {
+      const response = await fetch(`/api/distances?page=${page}&limit=1000`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.distances) {
+        allDistances.push(...data.distances)
+        hasMore = data.pagination?.hasMore || false
+        page++
+        
+        console.log(`Loaded page ${page - 1}: ${data.distances.length} distances, total so far: ${allDistances.length}`)
+      } else {
+        hasMore = false
+      }
+    } catch (error) {
+      console.error(`Error loading distances page ${page}:`, error)
+      hasMore = false
+    }
+  }
+  
+  console.log(`Finished loading all distances: ${allDistances.length} total`)
+  return allDistances
 }
 
 export default function AppPage() {
@@ -84,7 +126,7 @@ export default function AppPage() {
       const [sourcesData, destinationsData, distancesData] = await Promise.all([
         cachedFetch('/api/sources'),
         cachedFetch('/api/destinations'),
-        cachedFetch('/api/distances')
+        loadAllDistances() // Use new paginated function for distances
       ])
 
       setSources(sourcesData as Source[])
