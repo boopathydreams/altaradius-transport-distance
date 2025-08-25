@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TrashIcon } from '@heroicons/react/24/outline'
 
 interface Source {
   id: number
@@ -32,7 +33,10 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
   const [geocodingProgress, setGeocodingProgress] = useState<string>('')
 
   const handleDeleteSource = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this source? This will also delete all related distance calculations.')) {
+    const source = sources.find(s => s.id === id)
+    const sourceName = source ? source.name : `Source #${id}`
+    
+    if (!confirm(`Are you sure you want to delete "${sourceName}"?\n\nThis will also delete ALL related distance calculations.\n\nThis action cannot be undone.`)) {
       return
     }
 
@@ -43,25 +47,33 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       })
 
       if (response.ok) {
+        const result = await response.json()
         // Use callback to update parent state efficiently
         if (onSourceDeleted) {
           onSourceDeleted(id)
         } else {
           onRefresh()
         }
+        
+        // Show success message with details
+        alert(`Successfully deleted "${result.sourceName}" and ${result.deletedDistances} related distance calculations.`)
       } else {
-        alert('Failed to delete source')
+        const error = await response.json()
+        alert(`Failed to delete source: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting source:', error)
-      alert('Error deleting source')
+      alert('Error deleting source. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleDeleteDestination = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this destination? This will also delete all related distance calculations.')) {
+    const destination = destinations.find(d => d.id === id)
+    const destinationName = destination ? destination.name : `Destination #${id}`
+    
+    if (!confirm(`Are you sure you want to delete "${destinationName}"?\n\nThis will also delete ALL related distance calculations.\n\nThis action cannot be undone.`)) {
       return
     }
 
@@ -72,18 +84,23 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       })
 
       if (response.ok) {
+        const result = await response.json()
         // Use callback to update parent state efficiently
         if (onDestinationDeleted) {
           onDestinationDeleted(id)
         } else {
           onRefresh()
         }
+        
+        // Show success message with details
+        alert(`Successfully deleted "${result.destinationName}" and ${result.deletedDistances} related distance calculations.`)
       } else {
-        alert('Failed to delete destination')
+        const error = await response.json()
+        alert(`Failed to delete destination: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting destination:', error)
-      alert('Error deleting destination')
+      alert('Error deleting destination. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -348,8 +365,10 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
                         <button
                           onClick={() => handleDeleteSource(source.id)}
                           disabled={isLoading}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title={`Delete ${source.name} and all related distances`}
                         >
+                          <TrashIcon className="w-4 h-4 mr-1" />
                           Delete
                         </button>
                       </td>
@@ -427,8 +446,10 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
                         <button
                           onClick={() => handleDeleteDestination(destination.id)}
                           disabled={isLoading}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title={`Delete ${destination.name} and all related distances`}
                         >
+                          <TrashIcon className="w-4 h-4 mr-1" />
                           Delete
                         </button>
                       </td>
