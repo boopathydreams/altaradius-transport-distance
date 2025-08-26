@@ -4,7 +4,8 @@ import {
   MagnifyingGlassIcon,
   XMarkIcon,
   SparklesIcon,
-  BeakerIcon
+  BeakerIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline'
 
 interface Source {
@@ -174,6 +175,61 @@ export default function DistanceMatrix({
     }
   }
 
+  // Export functionality
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportToExcel = async () => {
+    if (isExporting) return
+
+    setIsExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (sourceFilter) params.set('sourceFilter', sourceFilter)
+      if (destinationFilter) params.set('destinationFilter', destinationFilter)
+
+      const response = await fetch(`/api/distances/export?${params}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Export failed')
+      }
+
+      // Get filename from Content-Disposition header or create default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'distance-matrix.xlsx'
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+
+      // Download the file
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      console.log('Excel export completed successfully')
+    } catch (error) {
+      console.error('Export error:', error)
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   // Only show empty filtered state if user has actually entered filter text
   const hasActiveFilters = sourceFilter.length > 0 || destinationFilter.length > 0
 
@@ -217,20 +273,45 @@ export default function DistanceMatrix({
     <main className="max-w-7xl mx-auto h-screen flex flex-col p-4" role="main">
       {/* Header */}
       <header className="mb-4 flex-shrink-0">
-        <div className="flex items-center space-x-3 mb-2">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-2 rounded-lg">
-            <ChartBarIcon className="h-6 w-6 text-white" aria-hidden="true" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-3">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-2 rounded-lg">
+              <ChartBarIcon className="h-6 w-6 text-white" aria-hidden="true" />
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              Distance Matrix
+            </h1>
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-            Distance Matrix
-          </h1>
-          {/* <div className="bg-green-100 px-3 py-1 rounded-full">
-            <span className="text-sm font-medium text-green-800">
-              {filteredDistances.length} {filteredDistances.length === distances.length ? 'routes' : `of ${distances.length} routes`}
-            </span>
-          </div> */}
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportToExcel}
+            disabled={isExporting || filteredDistances.length === 0}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 space-x-2"
+            title={hasActiveFilters ? 'Export filtered data to Excel' : 'Export all data to Excel'}
+          >
+            {isExporting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                <span>Export to Excel</span>
+              </>
+            )}
+          </button>
         </div>
-        <p className="text-gray-600 text-lg">View and analyze calculated distances between sources and destinations</p>
+
+        <div className="flex items-center justify-between">
+          <p className="text-gray-600 text-lg">View and analyze calculated distances between sources and destinations</p>
+          {hasActiveFilters && (
+            <div className="text-sm text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+              📊 Filtered view • Export will include filtered data only
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Simple Status Cards */}
