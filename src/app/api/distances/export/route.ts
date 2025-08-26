@@ -4,18 +4,6 @@ import { verifyToken } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 import type { Source, Destination } from '@prisma/client'
 
-type DistanceWithRelations = {
-  id: number
-  sourceId: number
-  destinationId: number
-  distance: number
-  duration: number | null
-  directionsUrl: string | null
-  createdAt: Date
-  source: Source
-  destination: Destination
-}
-
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication
@@ -62,28 +50,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data to export' }, { status: 400 })
     }
 
+    // Check if the dataset is too large (prevent memory issues)
+    const totalCells = sources.length * destinations.length
+    if (totalCells > 50000) {
+      return NextResponse.json({
+        error: `Dataset too large: ${sources.length} sources × ${destinations.length} destinations = ${totalCells.toLocaleString()} cells. Please apply filters to reduce the size.`
+      }, { status: 400 })
+    }
+
     console.log(`Exporting matrix: ${sources.length} sources × ${destinations.length} destinations`)
 
-    // Get all distances for the filtered sources and destinations
-    const distances: DistanceWithRelations[] = await prisma.distance.findMany({
-      where: {
-        sourceId: { in: sources.map((s: Source) => s.id) },
-        destinationId: { in: destinations.map((d: Destination) => d.id) }
-      },
-      include: {
-        source: true,
-        destination: true
-      }
-    })
-
-    console.log(`Found ${distances.length} distance records`)
+    // Process distances in chunks to avoid memory issues
+    const CHUNK_SIZE = 1000
+    const sourceIds = sources.map((s: Source) => s.id)
+    const destinationIds = destinations.map((d: Destination) => d.id)
 
     // Create a distance lookup map for efficient access
     const distanceMap = new Map<string, number>()
-    distances.forEach((distance: DistanceWithRelations) => {
-      const key = `${distance.sourceId}-${distance.destinationId}`
-      distanceMap.set(key, distance.distance)
-    })
+
+    // Process in chunks
+    for (let i = 0; i < sourceIds.length; i += CHUNK_SIZE) {
+      const sourceChunk = sourceIds.slice(i, i + CHUNK_SIZE)
+
+      const chunkDistances = await prisma.distance.findMany({
+        where: {
+          sourceId: { in: sourceChunk },
+          destinationId: { in: destinationIds }
+        },
+        select: {
+          sourceId: true,
+          destinationId: true,
+          distance: true
+        }
+      })
+
+      // Add to the distance map
+      chunkDistances.forEach((distance: { sourceId: number; destinationId: number; distance: number }) => {
+        const key = `${distance.sourceId}-${distance.destinationId}`
+        distanceMap.set(key, distance.distance)
+      })
+    }
+
+    console.log(`Processed ${distanceMap.size} distance records in chunks`)
 
     // Create the matrix data
     const matrixData: (string | number | null)[][] = []
@@ -135,7 +143,7 @@ export async function GET(request: NextRequest) {
       ['Destination filter', destinationFilter || 'None'],
       ['Total sources', sources.length],
       ['Total destinations', destinations.length],
-      ['Total distance records', distances.length],
+      ['Total distance records', distanceMap.size],
       [''],
       ['Instructions'],
       ['- Rows represent destinations'],
@@ -204,6 +212,22 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error generating Excel export:', error)
+
+    // Handle specific Prisma errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string; message?: string }
+
+      if (prismaError.code === 'P5000' || prismaError.code === 'P6009') {
+        return NextResponse.json(
+          {
+            error: 'Dataset too large for export. Please apply filters to reduce the number of sources and destinations.',
+            hint: 'Try filtering by specific source or destination names to reduce the dataset size.'
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     return NextResponse.json(
       { error: 'Failed to generate Excel export' },
       { status: 500 }
