@@ -799,6 +799,13 @@ export default function Calculator({
                     </div>
                   )}
                 </div>
+              ) : result?.type === 'success' && result.message ? (
+                <div className="p-6">
+                  <div className="flex items-start space-x-3">
+                    <CheckCircleIcon className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-green-700 font-medium">{result.message}</p>
+                  </div>
+                </div>
               ) : result && (
                 <div className="p-6">
                   <div className="flex items-start space-x-3">
