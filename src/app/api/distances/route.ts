@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-import { calculateDistance, geocodeAddressWithFallbacks } from '@/lib/googleMaps'
+import { calculateDistance, geocodeAddressWithFallbacks, batchCalculateDistances } from '@/lib/googleMaps'
+
+// Configuration for production optimization
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+const BATCH_SIZE_LIMIT = IS_PRODUCTION ? 25 : 100 // Smaller batches in production
+const FALLBACK_LIMIT = IS_PRODUCTION ? 5 : 10 // Even smaller fallback in production
+const BATCH_TIMEOUT = IS_PRODUCTION ? 30000 : 60000 // 30s in production, 60s in dev
 
 // Type definitions
 type DistanceCreateInput = {
@@ -274,9 +280,21 @@ async function calculateSingleDistance(sourceId: number, destinationId: number) 
 }
 
 async function calculateDistancesFromSource(sourceId: number) {
+  const startTime = Date.now()
+  const timeLimit = IS_PRODUCTION ? 25000 : 55000 // 25s in production, 55s in dev (leave 5s buffer)
+
   const source = await prisma.source.findUnique({ where: { id: sourceId } })
   if (!source) {
     return NextResponse.json({ error: 'Source not found' }, { status: 404 })
+  }
+
+  // Early timeout check
+  if (Date.now() - startTime > timeLimit) {
+    console.warn(`Early timeout detected for source ${source.name}`)
+    return NextResponse.json({
+      error: 'Request timeout - please try with filters to reduce dataset size',
+      timeout: true
+    }, { status: 408 })
   }
 
   const destinations = await prisma.destination.findMany({
@@ -305,45 +323,126 @@ async function calculateDistancesFromSource(sourceId: number) {
     existingDistanceMap.set(distance.destinationId, distance as typeof existingDistances[0])
   })
 
-  const results = []
+  // Separate destinations into existing and missing
+  const missingDestinations = destinations.filter((d: { id: number }) => !existingDistanceMap.has(d.id))
+  const results = [...existingDistances] // Start with all existing distances
 
-  for (const destination of destinations) {
-    const existingDistance = existingDistanceMap.get(destination.id)
+  console.log(`Source ${source.name}: ${existingDistances.length} existing, ${missingDestinations.length} missing distances`)
 
-    if (existingDistance) {
-      // Use existing distance
-      results.push(existingDistance)
-    } else if (destination.latitude && destination.longitude) {
-      // Calculate new distance
-      const result = await calculateDistance(
-        { latitude: source.latitude, longitude: source.longitude },
-        { latitude: destination.latitude, longitude: destination.longitude }
+  // Use batch calculation for missing distances to prevent timeout
+  if (missingDestinations.length > 0) {
+    const origins = [{ latitude: source.latitude, longitude: source.longitude }]
+
+    // Limit batch size for production
+    const batchSize = Math.min(BATCH_SIZE_LIMIT, missingDestinations.length)
+    const destinationsToProcess = missingDestinations.slice(0, batchSize)
+    const destinationLocations = destinationsToProcess.map((d: { latitude: number; longitude: number }) => ({
+      latitude: d.latitude,
+      longitude: d.longitude
+    }))
+
+    try {
+      console.log(`Using batch API to calculate ${destinationsToProcess.length} distances from ${source.name} (production limit: ${BATCH_SIZE_LIMIT})`)
+
+      // Early timeout check before batch operation
+      if (Date.now() - startTime > timeLimit - 5000) {
+        console.warn(`Skipping batch calculation due to time limit for source ${source.name}`)
+        return NextResponse.json(results.length > 0 ? results : {
+          error: 'Partial results - calculation timeout',
+          timeout: true
+        }, results.length > 0 ? { status: 200 } : { status: 408 })
+      }
+
+      // Add timeout wrapper for batch calculation
+      const batchPromise = batchCalculateDistances(origins, destinationLocations)
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Batch calculation timeout')), Math.min(BATCH_TIMEOUT, timeLimit - (Date.now() - startTime)))
       )
 
-      if (result) {
-        const distanceData: DistanceCreateInput = {
-          sourceId,
-          destinationId: destination.id,
-          distance: result.distance,
-          duration: result.duration,
-          route: result.route,
-          ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+      const batchResults = await Promise.race([batchPromise, timeoutPromise])
+
+      // Process batch results
+      if (batchResults && batchResults[0]) {
+        const sourceResults = batchResults[0]
+
+        for (let i = 0; i < destinationsToProcess.length && i < sourceResults.length; i++) {
+          const result = sourceResults[i]
+          const destination = destinationsToProcess[i] as { id: number; name: string; latitude: number; longitude: number }
+
+          if (result) {
+            const distanceData: DistanceCreateInput = {
+              sourceId,
+              destinationId: destination.id,
+              distance: result.distance,
+              duration: result.duration,
+              route: result.route,
+              directionsUrl: `https://www.google.com/maps/dir/${source.latitude},${source.longitude}/${destination.latitude},${destination.longitude}`
+            }
+
+            const distance = await prisma.distance.create({
+              data: distanceData,
+              include: {
+                source: true,
+                destination: true,
+              },
+            })
+
+            results.push(distance)
+          }
         }
+      }
+    } catch (error) {
+      console.error(`Batch calculation failed for source ${source.name}:`, error)
+      // Fall back to individual calculations with production limit
+      const fallbackLimit = Math.min(FALLBACK_LIMIT, missingDestinations.length)
 
-        const distance = await prisma.distance.create({
-          data: distanceData,
-          include: {
-            source: true,
-            destination: true,
-          },
-        })
+      for (let i = 0; i < fallbackLimit; i++) {
+        const destination = missingDestinations[i] as { id: number; name: string; latitude: number; longitude: number }
+        try {
+          const result = await calculateDistance(
+            { latitude: source.latitude, longitude: source.longitude },
+            { latitude: destination.latitude, longitude: destination.longitude }
+          )
 
-        results.push(distance)
+          if (result) {
+            const distanceData: DistanceCreateInput = {
+              sourceId,
+              destinationId: destination.id,
+              distance: result.distance,
+              duration: result.duration,
+              route: result.route,
+              ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+            }
+
+            const distance = await prisma.distance.create({
+              data: distanceData,
+              include: {
+                source: true,
+                destination: true,
+              },
+            })
+
+            results.push(distance)
+          }
+
+          // Small delay between fallback calls
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch (fallbackError) {
+          console.error(`Fallback calculation failed for ${source.name} to ${destination.name}:`, fallbackError)
+        }
       }
     }
   }
 
-  return NextResponse.json(results)
+  console.log(`Completed: Source ${source.name} now has ${results.length} total distances`)
+
+  // Add performance headers for debugging
+  const response = NextResponse.json(results)
+  response.headers.set('X-Calculation-Type', 'source-to-destinations')
+  response.headers.set('X-Total-Results', results.length.toString())
+  response.headers.set('X-Environment', IS_PRODUCTION ? 'production' : 'development')
+
+  return response
 }
 
 async function calculateDistancesToDestination(destinationId: number) {
@@ -377,45 +476,116 @@ async function calculateDistancesToDestination(destinationId: number) {
     existingDistanceMap.set(distance.sourceId, distance as typeof existingDistances[0])
   })
 
-  const results = []
+  // Separate sources into existing and missing
+  const missingSources = sources.filter((s: { id: number }) => !existingDistanceMap.has(s.id))
+  const results = [...existingDistances] // Start with all existing distances
 
-  for (const source of sources) {
-    const existingDistance = existingDistanceMap.get(source.id)
+  console.log(`Destination ${destination.name}: ${existingDistances.length} existing, ${missingSources.length} missing distances`)
 
-    if (existingDistance) {
-      // Use existing distance
-      results.push(existingDistance)
-    } else {
-      // Calculate new distance
-      const result = await calculateDistance(
-        { latitude: source.latitude, longitude: source.longitude },
-        { latitude: destination.latitude, longitude: destination.longitude }
+  // Use batch calculation for missing distances to prevent timeout
+  if (missingSources.length > 0) {
+    // Limit batch size for production
+    const batchSize = Math.min(BATCH_SIZE_LIMIT, missingSources.length)
+    const sourcesToProcess = missingSources.slice(0, batchSize)
+    const sourceLocations = sourcesToProcess.map((s: { latitude: number; longitude: number }) => ({
+      latitude: s.latitude,
+      longitude: s.longitude
+    }))
+    const destinations = [{ latitude: destination.latitude, longitude: destination.longitude }]
+
+    try {
+      console.log(`Using batch API to calculate ${sourcesToProcess.length} distances to ${destination.name} (production limit: ${BATCH_SIZE_LIMIT})`)
+
+      // Add timeout wrapper for batch calculation
+      const batchPromise = batchCalculateDistances(sourceLocations, destinations)
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Batch calculation timeout')), BATCH_TIMEOUT)
       )
 
-      if (result) {
-        const distanceData: DistanceCreateInput = {
-          sourceId: source.id,
-          destinationId,
-          distance: result.distance,
-          duration: result.duration,
-          route: result.route,
-          ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+      const batchResults = await Promise.race([batchPromise, timeoutPromise])
+
+      // Process batch results
+      if (batchResults && batchResults.length > 0) {
+        for (let i = 0; i < sourcesToProcess.length && i < batchResults.length; i++) {
+          const sourceResults = batchResults[i]
+          const source = sourcesToProcess[i] as { id: number; name: string; latitude: number; longitude: number }
+
+          if (sourceResults && sourceResults[0]) {
+            const result = sourceResults[0]
+
+            const distanceData: DistanceCreateInput = {
+              sourceId: source.id,
+              destinationId,
+              distance: result.distance,
+              duration: result.duration,
+              route: result.route,
+              directionsUrl: `https://www.google.com/maps/dir/${source.latitude},${source.longitude}/${destination.latitude},${destination.longitude}`
+            }
+
+            const distance = await prisma.distance.create({
+              data: distanceData,
+              include: {
+                source: true,
+                destination: true,
+              },
+            })
+
+            results.push(distance)
+          }
         }
+      }
+    } catch (error) {
+      console.error(`Batch calculation failed for destination ${destination.name}:`, error)
+      // Fall back to individual calculations with production limit
+      const fallbackLimit = Math.min(FALLBACK_LIMIT, missingSources.length)
 
-        const distance = await prisma.distance.create({
-          data: distanceData,
-          include: {
-            source: true,
-            destination: true,
-          },
-        })
+      for (let i = 0; i < fallbackLimit; i++) {
+        const source = missingSources[i] as { id: number; name: string; latitude: number; longitude: number }
+        try {
+          const result = await calculateDistance(
+            { latitude: source.latitude, longitude: source.longitude },
+            { latitude: destination.latitude, longitude: destination.longitude }
+          )
 
-        results.push(distance)
+          if (result) {
+            const distanceData: DistanceCreateInput = {
+              sourceId: source.id,
+              destinationId,
+              distance: result.distance,
+              duration: result.duration,
+              route: result.route,
+              ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
+            }
+
+            const distance = await prisma.distance.create({
+              data: distanceData,
+              include: {
+                source: true,
+                destination: true,
+              },
+            })
+
+            results.push(distance)
+          }
+
+          // Small delay between fallback calls
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch (fallbackError) {
+          console.error(`Fallback calculation failed from ${source.name} to ${destination.name}:`, fallbackError)
+        }
       }
     }
   }
 
-  return NextResponse.json(results)
+  console.log(`Completed: Destination ${destination.name} now has ${results.length} total distances`)
+
+  // Add performance headers for debugging
+  const response = NextResponse.json(results)
+  response.headers.set('X-Calculation-Type', 'sources-to-destination')
+  response.headers.set('X-Total-Results', results.length.toString())
+  response.headers.set('X-Environment', IS_PRODUCTION ? 'production' : 'development')
+
+  return response
 }
 
 async function calculateAllDistances() {
@@ -430,28 +600,43 @@ async function calculateAllDistances() {
     orderBy: { name: 'asc' }
   })
 
+  // Fetch ALL existing distances at once (PERFORMANCE FIX)
+  const existingDistances = await prisma.distance.findMany({
+    include: {
+      source: true,
+      destination: true,
+    },
+  })
+
+  // Create a lookup map for existing distances
+  const existingDistanceMap = new Map<string, typeof existingDistances[0]>()
+  existingDistances.forEach((distance: { sourceId: number; destinationId: number }) => {
+    const key = `${distance.sourceId}-${distance.destinationId}`
+    existingDistanceMap.set(key, distance as typeof existingDistances[0])
+  })
+
   const results = []
   let calculationCount = 0
+  const MAX_CALCULATIONS = 50 // Limit new calculations to prevent timeout
 
-  console.log(`Starting calculation for ${sources.length} sources and ${destinations.length} destinations`)
+  console.log(`Starting calculation for ${sources.length} sources and ${destinations.length} destinations (max ${MAX_CALCULATIONS} new calculations)`)
 
   for (const source of sources) {
-    for (const destination of destinations) {
-      let distance = await prisma.distance.findUnique({
-        where: {
-          sourceId_destinationId: {
-            sourceId: source.id,
-            destinationId: destination.id,
-          },
-        },
-        include: {
-          source: true,
-          destination: true,
-        },
-      })
+    if (calculationCount >= MAX_CALCULATIONS) {
+      console.log(`Reached maximum calculations limit (${MAX_CALCULATIONS}), stopping`)
+      break
+    }
 
-      if (!distance && destination.latitude && destination.longitude) {
-        console.log(`Calculating distance from ${source.name} to ${destination.name}`)
+    for (const destination of destinations) {
+      if (calculationCount >= MAX_CALCULATIONS) break
+
+      const key = `${source.id}-${destination.id}`
+      const existingDistance = existingDistanceMap.get(key)
+
+      if (existingDistance) {
+        results.push(existingDistance)
+      } else if (destination.latitude && destination.longitude) {
+        console.log(`Calculating distance from ${source.name} to ${destination.name} (${calculationCount + 1}/${MAX_CALCULATIONS})`)
 
         const result = await calculateDistance(
           { latitude: source.latitude, longitude: source.longitude },
@@ -468,7 +653,7 @@ async function calculateAllDistances() {
             ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
           }
 
-          distance = await prisma.distance.create({
+          const distance = await prisma.distance.create({
             data: distanceData,
             include: {
               source: true,
@@ -476,14 +661,13 @@ async function calculateAllDistances() {
             },
           })
           calculationCount++
+          results.push(distance)
+
+          // Add delay between API calls to respect rate limits
+          if (calculationCount % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          }
         }
-
-        // Add a small delay to respect API rate limits
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-
-      if (distance) {
-        results.push(distance)
       }
     }
   }

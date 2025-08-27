@@ -146,6 +146,11 @@ async function calculateSingleDistance(sourceId: number, destinationId: number) 
 }
 
 async function calculateDistancesFromSource(sourceId: number) {
+  const startTime = Date.now()
+  const timeoutMs = process.env.NODE_ENV === 'production' ? 30000 : 60000 // 30s in production, 60s in dev
+
+  console.log(`[Calculate API] Starting batch calculation from source ${sourceId} with ${timeoutMs}ms timeout`)
+
   const source = await prisma.source.findUnique({ where: { id: sourceId } })
   if (!source) {
     return NextResponse.json({ error: 'Source not found' }, { status: 404 })
@@ -159,24 +164,69 @@ async function calculateDistancesFromSource(sourceId: number) {
     orderBy: { name: 'asc' }
   })
 
+  // Check timeout before starting bulk operation
+  if (Date.now() - startTime > timeoutMs * 0.1) {
+    console.log('[Calculate API] Early timeout detected, aborting')
+    return NextResponse.json({
+      error: 'Request timeout',
+      timeout: true,
+      timeElapsed: Date.now() - startTime
+    }, { status: 408 })
+  }
+
+  // BULK QUERY OPTIMIZATION: Get all existing distances for this source at once
+  console.log(`[Calculate API] Fetching existing distances for source ${sourceId}`)
+  const destinationIds = destinations.map((destination: { id: number }) => destination.id)
+  const existingDistances = await prisma.distance.findMany({
+    where: {
+      sourceId: sourceId,
+      destinationId: { in: destinationIds }
+    },
+    include: {
+      source: true,
+      destination: true,
+    },
+  })
+
+  // Create a map for quick lookups
+  const existingDistanceMap = new Map(
+    existingDistances.map((distance: { destinationId: number }) => [distance.destinationId, distance])
+  )
+
+  console.log(`[Calculate API] Found ${existingDistances.length} existing distances, need to calculate ${destinations.length - existingDistances.length} new ones`)
+
   const results = []
   let calculationCount = 0
+  const uncalculatedDestinations = []
 
+  // First, collect all results (existing + destinations needing calculation)
   for (const destination of destinations) {
-    let distance = await prisma.distance.findUnique({
-      where: {
-        sourceId_destinationId: {
-          sourceId,
-          destinationId: destination.id,
-        },
-      },
-      include: {
-        source: true,
-        destination: true,
-      },
-    })
+    // Check timeout periodically
+    if (Date.now() - startTime > timeoutMs * 0.8) {
+      console.log(`[Calculate API] Approaching timeout after processing ${results.length} destinations`)
+      break
+    }
 
-    if (!distance && destination.latitude && destination.longitude) {
+    const existingDistance = existingDistanceMap.get(destination.id)
+
+    if (existingDistance) {
+      results.push(existingDistance)
+    } else if (destination.latitude && destination.longitude) {
+      uncalculatedDestinations.push(destination)
+    }
+  }
+
+  // If we have uncalculated destinations and time remaining, calculate them
+  if (uncalculatedDestinations.length > 0 && Date.now() - startTime < timeoutMs * 0.7) {
+    console.log(`[Calculate API] Calculating ${uncalculatedDestinations.length} missing distances`)
+
+    for (const destination of uncalculatedDestinations) {
+      // Check timeout before each calculation
+      if (Date.now() - startTime > timeoutMs * 0.8) {
+        console.log(`[Calculate API] Timeout approaching, stopping calculations. Processed ${calculationCount} new distances`)
+        break
+      }
+
       const result = await calculateDistance(
         { latitude: source.latitude, longitude: source.longitude },
         { latitude: destination.latitude, longitude: destination.longitude }
@@ -192,13 +242,15 @@ async function calculateDistancesFromSource(sourceId: number) {
           ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
         }
 
-        distance = await prisma.distance.create({
+        const distance = await prisma.distance.create({
           data: distanceData,
           include: {
             source: true,
             destination: true,
           },
         })
+
+        results.push(distance)
         calculationCount++
       }
 
@@ -207,14 +259,18 @@ async function calculateDistancesFromSource(sourceId: number) {
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
-
-    if (distance) {
-      results.push(distance)
-    }
   }
 
-  console.log(`Completed: ${calculationCount} new distances calculated from source ${sourceId}`)
-  return NextResponse.json(results)
+  const totalTime = Date.now() - startTime
+  console.log(`[Calculate API] Completed: ${calculationCount} new distances calculated from source ${sourceId} in ${totalTime}ms`)
+  console.log(`[Calculate API] Returning ${results.length} total results`)
+
+  const response = NextResponse.json(results)
+  response.headers.set('X-Calculation-Time', totalTime.toString())
+  response.headers.set('X-New-Calculations', calculationCount.toString())
+  response.headers.set('X-Total-Results', results.length.toString())
+
+  return response
 }
 
 async function calculateDistancesToDestination(destinationId: number) {
