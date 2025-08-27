@@ -102,6 +102,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check for duplicate pincode if provided
+    if (pincode) {
+      const existingDestination = await prisma.destination.findFirst({
+        where: {
+          pincode: pincode
+        }
+      })
+
+      if (existingDestination) {
+        return NextResponse.json(
+          {
+            error: 'Pincode already exists',
+            warning: `A destination with pincode "${pincode}" already exists: "${existingDestination.name}". Please use a different pincode or update the existing destination.`,
+            existingDestination: {
+              id: existingDestination.id,
+              name: existingDestination.name,
+              pincode: existingDestination.pincode
+            }
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     let finalLatitude = latitude
     let finalLongitude = longitude
 

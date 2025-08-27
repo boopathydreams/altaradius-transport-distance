@@ -32,6 +32,12 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
   const [batchPincodes, setBatchPincodes] = useState('')
   const [geocodingProgress, setGeocodingProgress] = useState<string>('')
 
+  // Edit states
+  const [editingSourceId, setEditingSourceId] = useState<number | null>(null)
+  const [editingDestinationId, setEditingDestinationId] = useState<number | null>(null)
+  const [editSourceData, setEditSourceData] = useState({ name: '', address: '', latitude: '', longitude: '' })
+  const [editDestinationData, setEditDestinationData] = useState({ name: '', pincode: '', address: '', latitude: '', longitude: '' })
+
   const handleDeleteSource = async (id: number) => {
     const source = sources.find(s => s.id === id)
     const sourceName = source ? source.name : `Source #${id}`
@@ -101,6 +107,97 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
     } catch (error) {
       console.error('Error deleting destination:', error)
       alert('Error deleting destination. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Edit functions
+  const handleEditSource = (source: Source) => {
+    setEditingSourceId(source.id)
+    setEditSourceData({
+      name: source.name,
+      address: source.address || '',
+      latitude: source.latitude?.toString() || '',
+      longitude: source.longitude?.toString() || ''
+    })
+  }
+
+  const handleSaveSource = async () => {
+    if (!editingSourceId) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/sources/${editingSourceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editSourceData.name,
+          address: editSourceData.address,
+          latitude: editSourceData.latitude ? parseFloat(editSourceData.latitude) : null,
+          longitude: editSourceData.longitude ? parseFloat(editSourceData.longitude) : null,
+        })
+      })
+
+      if (response.ok) {
+        setEditingSourceId(null)
+        onRefresh()
+        alert('Source updated successfully')
+      } else {
+        const error = await response.json()
+        alert(`Failed to update source: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error updating source:', error)
+      alert('Error updating source. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEditDestination = (destination: Destination) => {
+    setEditingDestinationId(destination.id)
+    setEditDestinationData({
+      name: destination.name,
+      pincode: destination.pincode || '',
+      address: destination.address || '',
+      latitude: destination.latitude?.toString() || '',
+      longitude: destination.longitude?.toString() || ''
+    })
+  }
+
+  const handleSaveDestination = async () => {
+    if (!editingDestinationId) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/destinations/${editingDestinationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editDestinationData.name,
+          pincode: editDestinationData.pincode,
+          address: editDestinationData.address,
+          latitude: editDestinationData.latitude ? parseFloat(editDestinationData.latitude) : null,
+          longitude: editDestinationData.longitude ? parseFloat(editDestinationData.longitude) : null,
+        })
+      })
+
+      if (response.ok) {
+        setEditingDestinationId(null)
+        onRefresh()
+        alert('Destination updated successfully')
+      } else {
+        const error = await response.json()
+        if (error.warning) {
+          alert(`Warning: ${error.warning}`)
+        } else {
+          alert(`Failed to update destination: ${error.error}`)
+        }
+      }
+    } catch (error) {
+      console.error('Error updating destination:', error)
+      alert('Error updating destination. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -240,7 +337,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
   }
 
   return (
-    <div className="max-w-6xl">
+    <div className="max-w-full">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Manage Data</h2>
 
       {/* Tab Navigation */}
@@ -350,28 +447,99 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sources.map((source) => (
                     <tr key={source.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{source.name}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{source.address}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {source.latitude.toFixed(6)}, {source.longitude.toFixed(6)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleDeleteSource(source.id)}
-                          disabled={isLoading}
-                          className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title={`Delete ${source.name} and all related distances`}
-                        >
-                          <TrashIcon className="w-4 h-4 mr-1" />
-                          Delete
-                        </button>
-                      </td>
+                      {editingSourceId === source.id ? (
+                        // Edit mode
+                        <>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editSourceData.name}
+                              onChange={(e) => setEditSourceData({ ...editSourceData, name: e.target.value })}
+                              className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Source name"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editSourceData.address}
+                              onChange={(e) => setEditSourceData({ ...editSourceData, address: e.target.value })}
+                              className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Address"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex space-x-1">
+                              <input
+                                type="number"
+                                step="any"
+                                value={editSourceData.latitude}
+                                onChange={(e) => setEditSourceData({ ...editSourceData, latitude: e.target.value })}
+                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="Lat"
+                              />
+                              <input
+                                type="number"
+                                step="any"
+                                value={editSourceData.longitude}
+                                onChange={(e) => setEditSourceData({ ...editSourceData, longitude: e.target.value })}
+                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="Long"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={handleSaveSource}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-green-200 rounded-md text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800 disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingSourceId(null)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        // Display mode
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{source.name}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{source.address}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {source.latitude.toFixed(6)}, {source.longitude.toFixed(6)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={() => handleEditSource(source)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-blue-200 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50"
+                              title={`Edit ${source.name}`}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSource(source.id)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title={`Delete ${source.name} and all related distances`}
+                            >
+                              <TrashIcon className="w-4 h-4 mr-1" />
+                              Delete
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -422,37 +590,117 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200 text-gray-500">
                   {destinations.map((destination) => (
                     <tr key={destination.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{destination.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{destination.pincode || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{destination.address || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {destination.latitude && destination.longitude
-                            ? `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`
-                            : '-'
-                          }
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleDeleteDestination(destination.id)}
-                          disabled={isLoading}
-                          className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title={`Delete ${destination.name} and all related distances`}
-                        >
-                          <TrashIcon className="w-4 h-4 mr-1" />
-                          Delete
-                        </button>
-                      </td>
+                      {editingDestinationId === destination.id ? (
+                        // Edit mode
+                        <>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editDestinationData.name}
+                              onChange={(e) => setEditDestinationData({ ...editDestinationData, name: e.target.value })}
+                              className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Destination name"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editDestinationData.pincode}
+                              onChange={(e) => setEditDestinationData({ ...editDestinationData, pincode: e.target.value })}
+                              className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Pincode"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editDestinationData.address}
+                              onChange={(e) => setEditDestinationData({ ...editDestinationData, address: e.target.value })}
+                              className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Address"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex space-x-1">
+                              <input
+                                type="number"
+                                step="any"
+                                value={editDestinationData.latitude}
+                                onChange={(e) => setEditDestinationData({ ...editDestinationData, latitude: e.target.value })}
+                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="Lat"
+                              />
+                              <input
+                                type="number"
+                                step="any"
+                                value={editDestinationData.longitude}
+                                onChange={(e) => setEditDestinationData({ ...editDestinationData, longitude: e.target.value })}
+                                className="w-20 border border-gray-300 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="Long"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={handleSaveDestination}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-green-200 rounded-md text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800 disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingDestinationId(null)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        // Display mode
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{destination.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{destination.pincode || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{destination.address || '-'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {destination.latitude && destination.longitude
+                                ? `${destination.latitude.toFixed(6)}, ${destination.longitude.toFixed(6)}`
+                                : '-'
+                              }
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={() => handleEditDestination(destination)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-blue-200 rounded-md text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 disabled:opacity-50"
+                              title={`Edit ${destination.name}`}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDestination(destination.id)}
+                              disabled={isLoading}
+                              className="inline-flex items-center px-3 py-1 border border-red-200 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title={`Delete ${destination.name} and all related distances`}
+                            >
+                              <TrashIcon className="w-4 h-4 mr-1" />
+                              Delete
+                            </button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

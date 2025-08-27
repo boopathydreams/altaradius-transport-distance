@@ -2,6 +2,60 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Verify authentication
+    const token = request.cookies.get('token')?.value
+    if (!token || !verifyToken(token)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const sourceId = parseInt(id)
+
+    if (isNaN(sourceId)) {
+      return NextResponse.json({ error: 'Invalid source ID' }, { status: 400 })
+    }
+
+    const { name, address, latitude, longitude } = await request.json()
+
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Update the source
+    const updatedSource = await prisma.source.update({
+      where: { id: sourceId },
+      data: {
+        name: name.trim(),
+        address: address?.trim() || null,
+        latitude: latitude || null,
+        longitude: longitude || null,
+      }
+    })
+
+    return NextResponse.json(updatedSource)
+
+  } catch (error) {
+    console.error('Error updating source:', error)
+
+    if (error instanceof Error && 'code' in error && error.code === 'P2025') {
+      return NextResponse.json({ error: 'Source not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

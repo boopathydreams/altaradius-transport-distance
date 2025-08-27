@@ -287,23 +287,34 @@ async function calculateDistancesFromSource(sourceId: number) {
     orderBy: { name: 'asc' }
   })
 
+  // Fetch all existing distances for this source at once (PERFORMANCE FIX)
+  const existingDistances = await prisma.distance.findMany({
+    where: {
+      sourceId: sourceId,
+      destinationId: { in: destinations.map((d: { id: number }) => d.id) }
+    },
+    include: {
+      source: true,
+      destination: true,
+    },
+  })
+
+  // Create a lookup map for existing distances
+  const existingDistanceMap = new Map<number, typeof existingDistances[0]>()
+  existingDistances.forEach((distance: { destinationId: number }) => {
+    existingDistanceMap.set(distance.destinationId, distance as typeof existingDistances[0])
+  })
+
   const results = []
 
   for (const destination of destinations) {
-    let distance = await prisma.distance.findUnique({
-      where: {
-        sourceId_destinationId: {
-          sourceId,
-          destinationId: destination.id,
-        },
-      },
-      include: {
-        source: true,
-        destination: true,
-      },
-    })
+    const existingDistance = existingDistanceMap.get(destination.id)
 
-    if (!distance && destination.latitude && destination.longitude) {
+    if (existingDistance) {
+      // Use existing distance
+      results.push(existingDistance)
+    } else if (destination.latitude && destination.longitude) {
+      // Calculate new distance
       const result = await calculateDistance(
         { latitude: source.latitude, longitude: source.longitude },
         { latitude: destination.latitude, longitude: destination.longitude }
@@ -319,18 +330,16 @@ async function calculateDistancesFromSource(sourceId: number) {
           ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
         }
 
-        distance = await prisma.distance.create({
+        const distance = await prisma.distance.create({
           data: distanceData,
           include: {
             source: true,
             destination: true,
           },
         })
-      }
-    }
 
-    if (distance) {
-      results.push(distance)
+        results.push(distance)
+      }
     }
   }
 
@@ -349,23 +358,35 @@ async function calculateDistancesToDestination(destinationId: number) {
   const sources = await prisma.source.findMany({
     orderBy: { name: 'asc' }
   })
+
+  // Fetch all existing distances for this destination at once (PERFORMANCE FIX)
+  const existingDistances = await prisma.distance.findMany({
+    where: {
+      destinationId: destinationId,
+      sourceId: { in: sources.map((s: { id: number }) => s.id) }
+    },
+    include: {
+      source: true,
+      destination: true,
+    },
+  })
+
+  // Create a lookup map for existing distances
+  const existingDistanceMap = new Map<number, typeof existingDistances[0]>()
+  existingDistances.forEach((distance: { sourceId: number }) => {
+    existingDistanceMap.set(distance.sourceId, distance as typeof existingDistances[0])
+  })
+
   const results = []
 
   for (const source of sources) {
-    let distance = await prisma.distance.findUnique({
-      where: {
-        sourceId_destinationId: {
-          sourceId: source.id,
-          destinationId,
-        },
-      },
-      include: {
-        source: true,
-        destination: true,
-      },
-    })
+    const existingDistance = existingDistanceMap.get(source.id)
 
-    if (!distance) {
+    if (existingDistance) {
+      // Use existing distance
+      results.push(existingDistance)
+    } else {
+      // Calculate new distance
       const result = await calculateDistance(
         { latitude: source.latitude, longitude: source.longitude },
         { latitude: destination.latitude, longitude: destination.longitude }
@@ -381,18 +402,16 @@ async function calculateDistancesToDestination(destinationId: number) {
           ...(result.directionsUrl && { directionsUrl: result.directionsUrl }),
         }
 
-        distance = await prisma.distance.create({
+        const distance = await prisma.distance.create({
           data: distanceData,
           include: {
             source: true,
             destination: true,
           },
         })
-      }
-    }
 
-    if (distance) {
-      results.push(distance)
+        results.push(distance)
+      }
     }
   }
 

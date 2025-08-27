@@ -133,7 +133,45 @@ export async function GET(request: NextRequest) {
     // Add worksheet to workbook
     const timestamp = new Date().toISOString().slice(0, 10)
     const sheetName = `Distance Matrix ${timestamp}`
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)    // Add metadata sheet
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+
+    // Create 2x Distance Matrix (To & Fro)
+    const matrix2xData: (string | number | null)[][] = []
+
+    // First row: headers (same as main sheet)
+    const header2xRow: (string | number | null)[] = ['Destination', 'Pincode', ...sources.map((s: Source) => s.name)]
+    matrix2xData.push(header2xRow)
+
+    // Data rows: destination name + pincode + distances * 2 for each source
+    destinations.forEach((destination: Destination) => {
+      const row: (string | number | null)[] = [
+        destination.name,
+        destination.pincode || ''
+      ]
+
+      sources.forEach((source: Source) => {
+        const key = `${source.id}-${destination.id}`
+        const distance = distanceMap.get(key)
+        // Double the distance for to & fro calculation
+        row.push(distance !== undefined ? Number((distance * 2).toFixed(1)) : null)
+      })
+
+      matrix2xData.push(row)
+    })
+
+    console.log(`2x Distance Matrix created: ${matrix2xData.length} rows × ${matrix2xData[0]?.length} columns`)
+
+    // Create 2x Distance worksheet
+    const worksheet2x = XLSX.utils.aoa_to_sheet(matrix2xData)
+
+    // Set column widths for 2x Distance sheet (same as main sheet)
+    worksheet2x['!cols'] = columnWidths
+
+    // Add 2x Distance worksheet to workbook
+    const sheetName2x = `2x Distance Matrix ${timestamp}`
+    XLSX.utils.book_append_sheet(workbook, worksheet2x, sheetName2x)
+
+    // Add metadata sheet
     const metadataData = [
       ['Export Information'],
       ['Generated on', new Date().toLocaleString()],
@@ -145,10 +183,15 @@ export async function GET(request: NextRequest) {
       ['Total destinations', destinations.length],
       ['Total distance records', distanceMap.size],
       [''],
+      ['Sheets Included'],
+      ['1. Distance Matrix - One-way distances in kilometers'],
+      ['2. 2x Distance Matrix - Round-trip distances (to & fro)'],
+      [''],
       ['Instructions'],
       ['- Rows represent destinations'],
       ['- Columns represent sources'],
-      ['- Values are distances in kilometers'],
+      ['- Values in Sheet 1 are one-way distances'],
+      ['- Values in Sheet 2 are doubled for round-trip calculations'],
       ['- Empty cells indicate no calculated route']
     ]
 
@@ -156,7 +199,7 @@ export async function GET(request: NextRequest) {
     metadataSheet['!cols'] = [{ wch: 25 }, { wch: 40 }]
 
     // Make headers in metadata sheet bold - Most compatible approach
-    const metadataHeaders = [0, 10] // "Export Information" and "Instructions" rows
+    const metadataHeaders = [0, 10, 14] // "Export Information", "Sheets Included", and "Instructions" rows
     metadataHeaders.forEach(rowIndex => {
       const cellAddr = XLSX.utils.encode_cell({ r: rowIndex, c: 0 })
       const cell = metadataSheet[cellAddr]
