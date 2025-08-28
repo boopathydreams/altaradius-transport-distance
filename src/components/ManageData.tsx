@@ -24,9 +24,21 @@ interface ManageDataProps {
   onRefresh: () => void
   onSourceDeleted?: (sourceId: number) => void
   onDestinationDeleted?: (destinationId: number) => void
+  onSuccess?: (message: string, duration?: number) => void
+  onError?: (message: string, duration?: number) => void
+  onWarning?: (message: string, duration?: number) => void
 }
 
-export default function ManageData({ sources, destinations, onRefresh, onSourceDeleted, onDestinationDeleted }: ManageDataProps) {
+export default function ManageData({ 
+  sources, 
+  destinations, 
+  onRefresh, 
+  onSourceDeleted, 
+  onDestinationDeleted,
+  onSuccess,
+  onError,
+  onWarning
+}: ManageDataProps) {
   const [activeTab, setActiveTab] = useState<'sources' | 'destinations' | 'tools'>('sources')
   const [isLoading, setIsLoading] = useState(false)
   const [batchPincodes, setBatchPincodes] = useState('')
@@ -58,18 +70,18 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
         if (onSourceDeleted) {
           onSourceDeleted(id)
         } else {
-          onRefresh()
+          await onRefresh()
         }
 
         // Show success message with details
-        alert(`Successfully deleted "${result.sourceName}" and ${result.deletedDistances} related distance calculations.`)
+        onSuccess?.(`Successfully deleted "${result.sourceName}" and ${result.deletedDistances} related distance calculations.`)
       } else {
         const error = await response.json()
-        alert(`Failed to delete source: ${error.error}`)
+        onError?.(`Failed to delete source: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting source:', error)
-      alert('Error deleting source. Please try again.')
+      onError?.('Error deleting source. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -95,18 +107,18 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
         if (onDestinationDeleted) {
           onDestinationDeleted(id)
         } else {
-          onRefresh()
+          await onRefresh()
         }
 
         // Show success message with details
-        alert(`Successfully deleted "${result.destinationName}" and ${result.deletedDistances} related distance calculations.`)
+        onSuccess?.(`Successfully deleted "${result.destinationName}" and ${result.deletedDistances} related distance calculations.`)
       } else {
         const error = await response.json()
-        alert(`Failed to delete destination: ${error.error}`)
+        onError?.(`Failed to delete destination: ${error.error}`)
       }
     } catch (error) {
       console.error('Error deleting destination:', error)
-      alert('Error deleting destination. Please try again.')
+      onError?.('Error deleting destination. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -127,6 +139,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
     if (!editingSourceId) return
 
     setIsLoading(true)
+    let success = false
     try {
       const response = await fetch(`/api/sources/${editingSourceId}`, {
         method: 'PUT',
@@ -140,18 +153,22 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       })
 
       if (response.ok) {
+        success = true
         setEditingSourceId(null)
-        onRefresh()
-        alert('Source updated successfully')
+        await onRefresh()
       } else {
         const error = await response.json()
-        alert(`Failed to update source: ${error.error}`)
+        onError?.(`Failed to update source: ${error.error}`)
       }
     } catch (error) {
       console.error('Error updating source:', error)
-      alert('Error updating source. Please try again.')
+      onError?.('Error updating source. Please try again.')
     } finally {
       setIsLoading(false)
+      // Show success message after loading is complete
+      if (success) {
+        onSuccess?.('Source updated successfully')
+      }
     }
   }
 
@@ -170,6 +187,8 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
     if (!editingDestinationId) return
 
     setIsLoading(true)
+    let success = false
+    let warningMessage = ''
     try {
       const response = await fetch(`/api/destinations/${editingDestinationId}`, {
         method: 'PUT',
@@ -184,22 +203,33 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       })
 
       if (response.ok) {
+        success = true
         setEditingDestinationId(null)
-        onRefresh()
-        alert('Destination updated successfully')
+        await onRefresh()
       } else {
         const error = await response.json()
         if (error.warning) {
-          alert(`Warning: ${error.warning}`)
+          success = true // Still a success, just with a warning
+          warningMessage = error.warning
+          setEditingDestinationId(null)
+          await onRefresh()
         } else {
-          alert(`Failed to update destination: ${error.error}`)
+          onError?.(`Failed to update destination: ${error.error}`)
         }
       }
     } catch (error) {
       console.error('Error updating destination:', error)
-      alert('Error updating destination. Please try again.')
+      onError?.('Error updating destination. Please try again.')
     } finally {
       setIsLoading(false)
+      // Show messages after loading is complete
+      if (success) {
+        if (warningMessage) {
+          onWarning?.(`Warning: ${warningMessage}`)
+        } else {
+          onSuccess?.('Destination updated successfully')
+        }
+      }
     }
   }
 
@@ -215,14 +245,14 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       })
 
       if (response.ok) {
-        onRefresh()
-        alert('All distances cleared successfully')
+        await onRefresh()
+        onSuccess?.('All distances cleared successfully')
       } else {
-        alert('Failed to clear distances')
+        onError?.('Failed to clear distances')
       }
     } catch (error) {
       console.error('Error clearing distances:', error)
-      alert('Error clearing distances')
+      onError?.('Error clearing distances')
     } finally {
       setIsLoading(false)
     }
@@ -230,14 +260,14 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
 
   const handleBatchGeocode = async () => {
     if (!batchPincodes.trim()) {
-      alert('Please enter pincodes to geocode')
+      onError?.('Please enter pincodes to geocode')
       return
     }
 
     const pincodes = batchPincodes.split('\n').map(p => p.trim()).filter(p => p)
 
     if (pincodes.length === 0) {
-      alert('Please enter valid pincodes')
+      onError?.('Please enter valid pincodes')
       return
     }
 
@@ -282,7 +312,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       }
 
       setGeocodingProgress(`Completed! ${successCount} success, ${failCount} failed`)
-      onRefresh()
+      await onRefresh()
 
       if (failCount === 0) {
         setBatchPincodes('')
@@ -302,7 +332,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
     )
 
     if (destinationsWithoutCoords.length === 0) {
-      alert('All destinations already have coordinates!')
+      onWarning?.('All destinations already have coordinates!')
       return
     }
 
@@ -324,7 +354,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
       if (response.ok) {
         const result = await response.json()
         setGeocodingProgress(`Completed! ${result.updated} out of ${result.total} destinations updated successfully`)
-        onRefresh()
+        await onRefresh()
       } else {
         setGeocodingProgress('Geocoding update failed')
       }
@@ -444,7 +474,7 @@ export default function ManageData({ sources, destinations, onRefresh, onSourceD
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200 text-gray-500">
                   {sources.map((source) => (
                     <tr key={source.id} className="hover:bg-gray-50">
                       {editingSourceId === source.id ? (

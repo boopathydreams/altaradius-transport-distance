@@ -5,6 +5,8 @@ import Sidebar from '../../components/Sidebar'
 import Calculator from '../../components/Calculator'
 import DistanceMatrix from '../../components/DistanceMatrix'
 import ManageData from '../../components/ManageData'
+import ToastContainer from '../../components/Toast'
+import { useToast } from '../../hooks/useToast'
 
 interface Source {
   id: number
@@ -135,6 +137,9 @@ const loadDistancePage = async (page: number = 1, limit: number = 50, sourceFilt
 }
 
 export default function AppPage() {
+  // Toast notifications
+  const { toasts, removeToast, success, error, warning } = useToast()
+  
   // Sidebar and section state - completely separate from data loading
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeSection, setActiveSection] = useState<'calculator' | 'distances' | 'manage'>('calculator')
@@ -298,9 +303,24 @@ export default function AppPage() {
     setHasLoadedStats(false)
     await loadInitialData()
 
-    // Reload current section data
+    // Force reload current section data (bypass hasLoaded checks)
     if (activeSection === 'calculator' || activeSection === 'manage') {
-      await Promise.all([loadSources(), loadDestinations()])
+      try {
+        // Force reload sources
+        const sourcesData = await cachedFetch('/api/sources')
+        setSources(sourcesData as Source[])
+        setHasLoadedSources(true)
+        
+        // Force reload destinations
+        const destinationsData = await cachedFetch('/api/destinations')
+        setDestinations(destinationsData as Destination[])
+        setHasLoadedDestinations(true)
+      } catch (error) {
+        console.error('Error reloading data:', error)
+        // Ensure flags are set to true even on error to prevent infinite loading
+        setHasLoadedSources(true)
+        setHasLoadedDestinations(true)
+      }
     } else if (activeSection === 'distances') {
       await loadDistancesPage(currentDistancePage)
     }
@@ -405,6 +425,9 @@ export default function AppPage() {
                     onRefresh={refreshDistances}
                     onSourceAdded={addSource}
                     onDestinationAdded={addDestination}
+                    onSuccess={success}
+                    onError={error}
+                    onWarning={warning}
                   />
                 )}
               </>
@@ -450,6 +473,9 @@ export default function AppPage() {
                     onRefresh={refreshData}
                     onSourceDeleted={removeSource}
                     onDestinationDeleted={removeDestination}
+                    onSuccess={success}
+                    onError={error}
+                    onWarning={warning}
                   />
                 )}
               </>
@@ -457,6 +483,9 @@ export default function AppPage() {
           </div>
         </main>
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   )
 }

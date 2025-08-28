@@ -52,6 +52,9 @@ interface CalculatorProps {
   onRefresh: () => void
   onSourceAdded?: (newSource: Source) => void
   onDestinationAdded?: (newDestination: Destination) => void
+  onSuccess?: (message: string) => void
+  onError?: (message: string) => void
+  onWarning?: (message: string) => void
 }
 
 interface ResultState {
@@ -67,7 +70,10 @@ export default function Calculator({
   calculatedCount,
   onRefresh,
   onSourceAdded,
-  onDestinationAdded
+  onDestinationAdded,
+  onSuccess,
+  onError,
+  onWarning
 }: CalculatorProps) {
   const [selectedSourceId, setSelectedSourceId] = useState<string>('')
   const [selectedDestinationId, setSelectedDestinationId] = useState<string>('')
@@ -174,21 +180,25 @@ export default function Calculator({
         const data = await response.json()
         if (selectedSourceId && selectedDestinationId && Array.isArray(data) && data.length > 0) {
           // Single distance calculation
+          onSuccess?.(`Distance calculated: ${data[0].distance} km`)
           setResult({
             type: 'success',
             distance: data[0]
           })
         } else if (data.message) {
           // Batch calculation response
+          onSuccess?.(data.message)
           setResult({
             type: 'success',
             message: data.message
           })
         } else {
           // Bulk calculation
+          const successMessage = `Successfully processed ${Array.isArray(data) ? data.length : 0} distance calculations.`
+          onSuccess?.(successMessage)
           setResult({
             type: 'success',
-            message: `Successfully processed ${Array.isArray(data) ? data.length : 0} distance calculations.`
+            message: successMessage
           })
         }
         onRefresh()
@@ -201,6 +211,7 @@ export default function Calculator({
       }
     } catch (error) {
       console.error('Error calculating distances:', error)
+      onError?.('Network error. Please try again.')
       setResult({
         type: 'error',
         message: 'Network error. Please try again.'
@@ -240,6 +251,7 @@ export default function Calculator({
         setNewSourceAddress('')
         setShowAddSource(false)
         setSelectedSourceId(newSource.id.toString())
+        onSuccess?.(`Successfully added source: ${newSource.name}`)
         setResult({
           type: 'success',
           message: `Successfully added source: ${newSource.name}`
@@ -259,6 +271,7 @@ export default function Calculator({
       }
     } catch (error) {
       console.error('Error adding source:', error)
+      onError?.('Failed to add source. Please try again.')
       setResult({
         type: 'error',
         message: 'Network error. Please try again.'
@@ -300,6 +313,7 @@ export default function Calculator({
         setNewDestinationLongitude('')
         setShowAddDestination(false)
         setSelectedDestinationId(newDestination.id.toString())
+        onSuccess?.(`Successfully added destination: ${newDestination.name}`)
         setResult({
           type: 'success',
           message: `Successfully added destination: ${newDestination.name}`
@@ -319,6 +333,7 @@ export default function Calculator({
       }
     } catch (error) {
       console.error('Error adding destination:', error)
+      onError?.('Failed to add destination. Please try again.')
       setResult({
         type: 'error',
         message: 'Network error. Please try again.'
