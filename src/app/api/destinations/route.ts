@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' }
     })
 
+    // Sort case-insensitively for proper alphabetical order
+    destinations.sort((a: Destination, b: Destination) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+
     return NextResponse.json(destinations)
   } catch (error) {
     console.error('Error fetching destinations:', error)

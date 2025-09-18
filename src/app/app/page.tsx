@@ -139,7 +139,7 @@ const loadDistancePage = async (page: number = 1, limit: number = 50, sourceFilt
 export default function AppPage() {
   // Toast notifications
   const { toasts, removeToast, success, error, warning } = useToast()
-  
+
   // Sidebar and section state - completely separate from data loading
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeSection, setActiveSection] = useState<'calculator' | 'distances' | 'manage'>('calculator')
@@ -310,7 +310,7 @@ export default function AppPage() {
         const sourcesData = await cachedFetch('/api/sources')
         setSources(sourcesData as Source[])
         setHasLoadedSources(true)
-        
+
         // Force reload destinations
         const destinationsData = await cachedFetch('/api/destinations')
         setDestinations(destinationsData as Destination[])
@@ -483,7 +483,7 @@ export default function AppPage() {
           </div>
         </main>
       </div>
-      
+
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>

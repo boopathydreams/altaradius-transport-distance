@@ -29,11 +29,11 @@ interface ManageDataProps {
   onWarning?: (message: string, duration?: number) => void
 }
 
-export default function ManageData({ 
-  sources, 
-  destinations, 
-  onRefresh, 
-  onSourceDeleted, 
+export default function ManageData({
+  sources,
+  destinations,
+  onRefresh,
+  onSourceDeleted,
   onDestinationDeleted,
   onSuccess,
   onError,

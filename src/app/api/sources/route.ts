@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import type { Source } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
     const sources = await prisma.source.findMany({
       orderBy: { name: 'asc' }
     })
+
+    // Sort case-insensitively for proper alphabetical order
+    sources.sort((a: Source, b: Source) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
 
     return NextResponse.json(sources)
   } catch (error) {

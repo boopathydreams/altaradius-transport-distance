@@ -95,8 +95,8 @@ function ToastItem({ toast, onClose }: ToastProps) {
       className={`
         relative flex items-start p-4 mb-3 rounded-lg border shadow-lg transition-all duration-300 ease-in-out
         ${getBackgroundColor()}
-        ${isVisible && !isLeaving 
-          ? 'transform translate-x-0 opacity-100' 
+        ${isVisible && !isLeaving
+          ? 'transform translate-x-0 opacity-100'
           : isLeaving
           ? 'transform translate-x-full opacity-0'
           : 'transform translate-x-full opacity-0'

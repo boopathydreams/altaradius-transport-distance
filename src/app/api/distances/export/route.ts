@@ -46,6 +46,10 @@ export async function GET(request: NextRequest) {
       })
     ])
 
+    // Sort sources and destinations case-insensitively for proper alphabetical order
+    sources.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+    destinations.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+
     if (sources.length === 0 || destinations.length === 0) {
       return NextResponse.json({ error: 'No data to export' }, { status: 400 })
     }
